@@ -222,6 +222,8 @@ erDiagram
 - Una base de datos PostgreSQL. Lo más simple es usar **el mismo proyecto gratuito de Supabase o Neon** que usarás en producción (sección 8). Alternativa con Docker:
   `docker run --name pg-ucc -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=observatorio -p 5432:5432 -d postgres:16`
 
+> **Windows + OneDrive:** no instales el proyecto dentro de una carpeta sincronizada con OneDrive (por ejemplo `Escritorio` cuando está respaldado). `npm install` crea decenas de miles de archivos en `node_modules`; OneDrive intenta subirlos y suele provocar errores `EPERM`/`EBUSY` y lentitud. Copia la carpeta a una ruta local, por ejemplo `C:\dev\observatorio-desercion-ucc`, y trabaja desde ahí (en GitHub y Vercel no cambia nada).
+
 ### Pasos
 
 ```bash
@@ -394,7 +396,8 @@ Todos los supuestos (SMMLV 2026, salarios de enganche del Observatorio Laboral p
 - **Anonimización**: cada estudiante tiene un `hashAnonimo`; el dashboard solo muestra agregados.
 - **Consentimiento**: campos `consentimientoDatos` / `fechaConsentimiento` en estudiantes y `consentimiento` en encuestas (Fase 2).
 - **Validación Zod** en cada endpoint con mensajes en español; errores controlados con códigos HTTP correctos (400, 401, 403, 404).
-- El login solo redirige a rutas internas (evita redirecciones abiertas).
+- El login solo redirige a rutas internas (rechaza `//sitio` y `/\sitio`, evitando redirecciones abiertas).
+- Pendiente para la Fase 3: límite de intentos de inicio de sesión (rate limiting) y tabla de auditoría persistente.
 
 ---
 
@@ -430,7 +433,9 @@ npm test
 - `seed-integridad.test.ts` (12): llaves foráneas, unicidad, coherencia estado/retiro, rangos válidos y realismo de la deserción simulada.
 - `conversores.test.ts` (6): conversión de parámetros y formatos.
 
-Además, durante la auditoría de la Fase 1 se verificó de punta a punta contra PostgreSQL 16: migración, seed (y re-seed), login de los 4 roles, matriz de permisos de todas las rutas y APIs, validaciones, edición de parámetros y flujo completo en navegador (Chromium) en escritorio y móvil, sin errores de consola.
+Además, en la auditoría de la Fase 1 se verificó de punta a punta contra **PostgreSQL 16**: la migración `prisma/migrations` (estructura idéntica al esquema: columnas, tipos, restricciones, índices y enums), seed y re-seed, login de los 4 roles, matriz de permisos de todas las rutas y APIs (69 verificaciones), validaciones con mensajes en español, edición de parámetros reflejada en calculadora y dashboard, y el flujo completo en navegador (Chromium) en escritorio y móvil, sin errores de consola.
+
+> Nota técnica: el entorno donde se hizo esa verificación no permitía descargar los binarios nativos de Prisma, así que se ejecutó con el motor WASM oficial de Prisma 5.22 y el adaptador `pg`. Es el mismo cliente y las mismas consultas; en tu PC y en Vercel Prisma usa su motor nativo normal y no necesitas hacer nada distinto.
 
 ---
 
