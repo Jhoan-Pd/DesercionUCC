@@ -1,5 +1,6 @@
 -- Migración inicial del Observatorio de Deserción UCC (16 tablas + enums).
--- Generada con: prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script
+-- Equivalente a: prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script
+-- (estructura verificada contra el esquema: columnas, tipos, restricciones, índices y enums).
 
 
 -- CreateEnum
