@@ -24,6 +24,10 @@ export const REGLAS_RUTAS: { prefijo: string; roles: Rol[] }[] = [
   { prefijo: "/api/dashboard", roles: ["ADMIN", "BIENESTAR"] },
   { prefijo: "/api/impacto", roles: TODOS },
   { prefijo: "/api/parametros", roles: ["ADMIN"] },
+  { prefijo: "/api/riesgo", roles: ["ADMIN", "BIENESTAR"] },
+  { prefijo: "/api/alertas", roles: ["DOCENTE", "BIENESTAR", "ADMIN"] },
+  { prefijo: "/api/encuesta", roles: ["ESTUDIANTE"] },
+  { prefijo: "/api/docente", roles: ["DOCENTE", "ADMIN"] },
 ];
 
 /** ¿Puede este rol abrir esta ruta? Rutas sin regla => solo requieren sesión. */
