@@ -215,9 +215,13 @@ export function CalculadoraImpactoForm({ perfilInicial, rol }: Props) {
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="programaId">Programa</Label>
                 {esEstudianteConPerfil ? (
-                  <p id="programaId" className="flex h-10 items-center rounded-md border bg-secondary/50 px-3 text-sm font-medium">{programa.nombre}</p>
+                  <span id="etiqueta-programa" className="text-sm font-medium leading-none">Programa</span>
+                ) : (
+                  <Label htmlFor="programaId">Programa</Label>
+                )}
+                {esEstudianteConPerfil ? (
+                  <p aria-labelledby="etiqueta-programa" data-testid="programa-fijo" className="flex h-10 items-center rounded-md border bg-secondary/50 px-3 text-sm font-medium">{programa.nombre}</p>
                 ) : (
                   <Select
                     id="programaId"
