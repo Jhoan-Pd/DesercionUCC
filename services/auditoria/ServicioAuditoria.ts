@@ -8,6 +8,7 @@ export type AccionAuditoria =
   | "INTERVENCION"
   | "LOGIN_BLOQUEADO"
   | "ADMIN_USUARIOS"
+  | "ADMIN_CATALOGOS"
   | "ADMIN_MODELO";
 
 export interface EventoAuditoria {
