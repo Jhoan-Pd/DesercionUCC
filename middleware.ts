@@ -25,7 +25,11 @@ export async function middleware(req: NextRequest) {
     if (esApi) return NextResponse.json({ error: "No tienes permisos para esta operación." }, { status: 403 });
     return NextResponse.redirect(new URL("/acceso-denegado", req.url));
   }
-  return NextResponse.next();
+  // La ruta viaja al layout para que vuelva a verificar el permiso con el rol ACTUAL de la BD
+  // (el rol del token puede estar desactualizado si el administrador lo cambió)
+  const cabeceras = new Headers(req.headers);
+  cabeceras.set("x-ruta", pathname);
+  return NextResponse.next({ request: { headers: cabeceras } });
 }
 
 export const config = {
