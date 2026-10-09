@@ -31,6 +31,8 @@ async function main() {
 
   console.log("🧹 Limpiando datos existentes...");
   await prisma.$transaction([
+    prisma.auditoriaAcceso.deleteMany(),
+    prisma.importacion.deleteMany(),
     prisma.inscripcion.deleteMany(),
     prisma.respuestaEncuesta.deleteMany(),
     prisma.encuesta.deleteMany(),

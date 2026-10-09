@@ -113,18 +113,21 @@ model Rol {
 }
 
 model Usuario {
-  id           String      @id @default(uuid())
-  email        String      @unique
-  nombre       String
-  passwordHash String
-  activo       Boolean     @default(true)
-  rolId        Int
-  rol          Rol         @relation(fields: [rolId], references: [id])
+  id               String      @id @default(uuid())
+  email            String      @unique
+  nombre           String
+  passwordHash     String
+  activo           Boolean     @default(true)
+  rolId            Int
+  rol              Rol         @relation(fields: [rolId], references: [id])
   /// Si el usuario es ESTUDIANTE, enlaza con su registro académico
-  estudianteId String?     @unique
-  estudiante   Estudiante? @relation(fields: [estudianteId], references: [id])
-  creadoEn     DateTime    @default(now())
-  ultimoAcceso DateTime?
+  estudianteId     String?     @unique
+  estudiante       Estudiante? @relation(fields: [estudianteId], references: [id])
+  creadoEn         DateTime    @default(now())
+  ultimoAcceso     DateTime?
+  /// Protección contra fuerza bruta: intentos fallidos seguidos y bloqueo temporal
+  intentosFallidos Int         @default(0)
+  bloqueadoHasta   DateTime?
 
   alertasCreadas     Alerta[]
   intervenciones     Intervencion[]
@@ -133,6 +136,8 @@ model Usuario {
   cursos             Curso[]
   /// Versiones del modelo de riesgo que entrenó (rol ADMIN)
   modelosEntrenados  ModeloRiesgo[]
+  importaciones      Importacion[]
+  auditorias         AuditoriaAcceso[]
 
   @@index([rolId])
   @@map("usuarios")
@@ -175,6 +180,7 @@ model Periodo {
   estudiantesIngreso Estudiante[]
   puntajes           PuntajeRiesgo[]
   cursos             Curso[]
+  intervenciones     Intervencion[]
 
   @@map("periodos")
 }
@@ -364,19 +370,20 @@ model PuntajeRiesgo {
 }
 
 model Alerta {
-  id            String       @id @default(uuid())
-  estudianteId  String
-  estudiante    Estudiante   @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  creadaPorId   String?
-  creadaPor     Usuario?     @relation(fields: [creadaPorId], references: [id])
+  id             String         @id @default(uuid())
+  estudianteId   String
+  estudiante     Estudiante     @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  creadaPorId    String?
+  creadaPor      Usuario?       @relation(fields: [creadaPorId], references: [id])
   /// Curso desde el que un docente reportó la alerta (opcional)
-  cursoId       String?
-  curso         Curso?       @relation(fields: [cursoId], references: [id], onDelete: SetNull)
-  origen        OrigenAlerta
-  motivo        String
-  estado        EstadoAlerta @default(ABIERTA)
-  creadaEn      DateTime     @default(now())
-  actualizadaEn DateTime     @updatedAt
+  cursoId        String?
+  curso          Curso?         @relation(fields: [cursoId], references: [id], onDelete: SetNull)
+  origen         OrigenAlerta
+  motivo         String
+  estado         EstadoAlerta   @default(ABIERTA)
+  creadaEn       DateTime       @default(now())
+  actualizadaEn  DateTime       @updatedAt
+  intervenciones Intervencion[]
 
   @@index([estudianteId])
   @@index([estado])
@@ -394,9 +401,18 @@ model Intervencion {
   descripcion   String
   montoApoyo    Int?
   estado        EstadoIntervencion @default(EN_CURSO)
+  /// Periodo académico en que se hizo (permite medir si el estudiante permaneció después)
+  periodoId     String?
+  periodo       Periodo?           @relation(fields: [periodoId], references: [id], onDelete: SetNull)
+  /// Alerta que originó la intervención (opcional)
+  alertaId      String?
+  alerta        Alerta?            @relation(fields: [alertaId], references: [id], onDelete: SetNull)
+  /// Observación al cerrar la intervención
+  resultado     String?
 
   @@index([estudianteId])
   @@index([tipo])
+  @@index([periodoId])
   @@map("intervenciones")
 }
 
@@ -484,4 +500,42 @@ model ModeloRiesgo {
 
   @@index([activo])
   @@map("modelos_riesgo")
+}
+
+// ---------------------------------------------------------------------
+// Fase 3: trazabilidad de importaciones CSV y auditoría de accesos
+// ---------------------------------------------------------------------
+
+/// Cada carga de un archivo CSV de estudiantes (quién, cuándo y qué cambió)
+model Importacion {
+  id                      String   @id @default(uuid())
+  archivo                 String
+  filas                   Int
+  estudiantesNuevos       Int
+  estudiantesActualizados Int
+  semestres               Int
+  usuarioId               String
+  usuario                 Usuario  @relation(fields: [usuarioId], references: [id])
+  creadaEn                DateTime @default(now())
+
+  @@index([creadaEn])
+  @@map("importaciones")
+}
+
+/// Registro persistente de accesos a datos personales (Ley 1581 de 2012)
+model AuditoriaAcceso {
+  id        String   @id @default(uuid())
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  rol       String
+  /// CONSULTA_FICHA, CONSULTA_CALCULADORA, EXPORTACION, IMPORTACION, LOGIN_BLOQUEADO...
+  accion    String
+  /// Identificador anónimo del estudiante o nombre del recurso (nunca nombres ni documentos)
+  recurso   String
+  detalle   String?
+  creadoEn  DateTime @default(now())
+
+  @@index([creadoEn])
+  @@index([usuarioId])
+  @@map("auditoria_accesos")
 }
