@@ -23,7 +23,7 @@ export const MODULOS: Modulo[] = [
   { href: "/intervenciones", titulo: "Intervenciones", descripcion: "Registro de acciones de Bienestar y medición de su efectividad.", icono: "intervenciones", roles: ["ADMIN", "BIENESTAR"], fase: 3 },
   { href: "/impacto-institucional", titulo: "Impacto institucional", descripcion: "Ingresos por matrícula dejados de percibir y proyección de mejora.", icono: "institucional", roles: ["ADMIN", "BIENESTAR"], fase: 3 },
   { href: "/reportes", titulo: "Reportes", descripcion: "Exportación en PDF y Excel con datos anonimizados.", icono: "reportes", roles: ["ADMIN", "BIENESTAR"], fase: 3 },
-  { href: "/admin/parametros", titulo: "Parámetros", descripcion: "Salarios de referencia, costos y valores SPADIES editables.", icono: "admin", roles: ["ADMIN"], fase: 1 },
+  { href: "/admin", titulo: "Administración", descripcion: "Parámetros, programas, periodos, usuarios, modelo de riesgo, importación CSV y auditoría.", icono: "admin", roles: ["ADMIN"], fase: 1 },
 ];
 
 export function modulosParaRol(rol: Rol): Modulo[] {
