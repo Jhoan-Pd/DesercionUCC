@@ -19,6 +19,8 @@ export class ErrorApi extends Error {
 interface Contexto {
   req: Request;
   session: Session;
+  /** Parámetros de la ruta dinámica (p. ej. { id } en /api/alertas/[id]) */
+  params: Record<string, string>;
 }
 
 /**
@@ -26,12 +28,12 @@ interface Contexto {
  * Un solo lugar para esto evita repetir try/catch y deja las rutas cortas y legibles.
  */
 export function manejar(roles: Rol[] | null, handler: (ctx: Contexto) => Promise<unknown>) {
-  return async (req: Request): Promise<NextResponse> => {
+  return async (req: Request, ruta?: { params?: Record<string, string> }): Promise<NextResponse> => {
     try {
       const session = await getServerSession(authOptions);
       if (!session) throw new ErrorApi(401, "No autenticado. Inicia sesión para continuar.");
       if (roles && !roles.includes(session.user.rol)) throw new ErrorApi(403, "No tienes permisos para esta operación.");
-      const resultado = await handler({ req, session });
+      const resultado = await handler({ req, session, params: ruta?.params ?? {} });
       return NextResponse.json(resultado);
     } catch (error) {
       return respuestaDeError(error);

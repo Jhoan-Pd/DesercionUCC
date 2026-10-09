@@ -42,5 +42,9 @@ export const config = {
     "/api/dashboard/:path*",
     "/api/impacto/:path*",
     "/api/parametros/:path*",
+    "/api/riesgo/:path*",
+    "/api/alertas/:path*",
+    "/api/encuesta/:path*",
+    "/api/docente/:path*",
   ],
 };
