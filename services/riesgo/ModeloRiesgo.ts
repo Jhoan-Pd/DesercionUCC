@@ -108,6 +108,13 @@ export class ModeloRiesgo {
   }
 
   /** Texto corto de un factor: "Promedio del semestre: 2,6 (promedio 3,5)" */
+  /** Etiqueta breve con el valor del estudiante: "Tiene beca: no", "Promedio del semestre: 1,49" */
+  static etiquetaCorta(f: Factor): string {
+    if (f.formato === "binario") return `${f.etiqueta}: ${f.valor >= 0.5 ? "sí" : "no"}`;
+    const d = ModeloRiesgo.describir(f);
+    return d.replace(/ \(promedio [^)]*\)$/, "");
+  }
+
   static describir(f: Factor): string {
     const fmt = (v: number) => {
       switch (f.formato) {

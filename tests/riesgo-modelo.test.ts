@@ -130,3 +130,12 @@ describe("métricas", () => {
     expect(esDePrueba("abc")).toBe(esDePrueba("abc"));
   });
 });
+
+describe("ModeloRiesgo.etiquetaCorta", () => {
+  it("muestra el valor del estudiante para que la explicación no confunda", () => {
+    const base = { clave: "x", promedio: 0.2, aporte: 0.1, aporteRelativo: 0 } as const;
+    expect(ModeloRiesgo.etiquetaCorta({ ...base, etiqueta: "Tiene beca", formato: "binario", valor: 0 } as never)).toBe("Tiene beca: no");
+    expect(ModeloRiesgo.etiquetaCorta({ ...base, etiqueta: "Tiene beca", formato: "binario", valor: 1 } as never)).toBe("Tiene beca: sí");
+    expect(ModeloRiesgo.etiquetaCorta({ ...base, etiqueta: "Promedio del semestre", formato: "nota", valor: 1.49, promedio: 3.5 } as never)).toBe("Promedio del semestre: 1,49");
+  });
+});
