@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { ImportadorArchivo } from "@/components/admin/ImportadorArchivo";
+import { MigaAdmin } from "@/components/admin/MigaAdmin";
 
 export const metadata = { title: "Importar estudiantes" };
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export default async function ImportarPage() {
   return (
     <div className="space-y-6">
       <header className="space-y-1">
+        <MigaAdmin actual="Importar CSV" />
         <h1 className="text-2xl font-bold tracking-tight">Importar estudiantes desde CSV</h1>
         <p className="max-w-3xl text-muted-foreground">
           Carga datos reales de Registro Académico: una fila por estudiante y semestre cursado. Si un estudiante ya existe (mismo código), su trayectoria se reemplaza con la del archivo.
