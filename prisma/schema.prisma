@@ -113,22 +113,26 @@ model Rol {
 }
 
 model Usuario {
-  id           String    @id @default(uuid())
-  email        String    @unique
+  id           String      @id @default(uuid())
+  email        String      @unique
   nombre       String
   passwordHash String
-  activo       Boolean   @default(true)
+  activo       Boolean     @default(true)
   rolId        Int
-  rol          Rol       @relation(fields: [rolId], references: [id])
+  rol          Rol         @relation(fields: [rolId], references: [id])
   /// Si el usuario es ESTUDIANTE, enlaza con su registro académico
-  estudianteId String?   @unique
+  estudianteId String?     @unique
   estudiante   Estudiante? @relation(fields: [estudianteId], references: [id])
-  creadoEn     DateTime  @default(now())
+  creadoEn     DateTime    @default(now())
   ultimoAcceso DateTime?
 
-  alertasCreadas  Alerta[]
-  intervenciones  Intervencion[]
+  alertasCreadas     Alerta[]
+  intervenciones     Intervencion[]
   parametrosEditados ParametroEconomico[]
+  /// Cursos que dicta (rol DOCENTE)
+  cursos             Curso[]
+  /// Versiones del modelo de riesgo que entrenó (rol ADMIN)
+  modelosEntrenados  ModeloRiesgo[]
 
   @@index([rolId])
   @@map("usuarios")
@@ -139,16 +143,17 @@ model Usuario {
 // ---------------------------------------------------------------------
 
 model Programa {
-  id                 String  @id @default(uuid())
-  nombre             String  @unique
-  facultad           String
-  duracionSemestres  Int
+  id                String  @id @default(uuid())
+  nombre            String  @unique
+  facultad          String
+  duracionSemestres Int
   /// Valor de matrícula por semestre (COP)
-  valorSemestre      Int
-  activo             Boolean @default(true)
+  valorSemestre     Int
+  activo            Boolean @default(true)
 
   estudiantes Estudiante[]
   parametros  ParametroEconomico[]
+  cursos      Curso[]
 
   @@map("programas")
 }
@@ -164,11 +169,12 @@ model Periodo {
   fechaFin    DateTime
   activo      Boolean  @default(false)
 
-  matriculas       Matricula[]
-  notas            NotaSemestre[]
-  retiros          Retiro[]
+  matriculas         Matricula[]
+  notas              NotaSemestre[]
+  retiros            Retiro[]
   estudiantesIngreso Estudiante[]
-  puntajes         PuntajeRiesgo[]
+  puntajes           PuntajeRiesgo[]
+  cursos             Curso[]
 
   @@map("periodos")
 }
@@ -214,6 +220,7 @@ model Estudiante {
   puntajes       PuntajeRiesgo[]
   alertas        Alerta[]
   intervenciones Intervencion[]
+  inscripciones  Inscripcion[]
 
   @@index([programaId])
   @@index([cohorte])
@@ -223,13 +230,13 @@ model Estudiante {
 }
 
 model Matricula {
-  id            String     @id @default(uuid())
-  estudianteId  String
-  estudiante    Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  periodoId     String
-  periodo       Periodo    @relation(fields: [periodoId], references: [id])
+  id             String     @id @default(uuid())
+  estudianteId   String
+  estudiante     Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  periodoId      String
+  periodo        Periodo    @relation(fields: [periodoId], references: [id])
   /// Número de semestre académico cursado (1, 2, 3...)
-  semestre      Int
+  semestre       Int
   valorMatricula Int
 
   @@unique([estudianteId, periodoId])
@@ -238,16 +245,16 @@ model Matricula {
 }
 
 model NotaSemestre {
-  id               String     @id @default(uuid())
-  estudianteId     String
-  estudiante       Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  periodoId        String
-  periodo          Periodo    @relation(fields: [periodoId], references: [id])
-  semestre         Int
-  promedio         Float // escala 0.0 - 5.0
+  id                String     @id @default(uuid())
+  estudianteId      String
+  estudiante        Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  periodoId         String
+  periodo           Periodo    @relation(fields: [periodoId], references: [id])
+  semestre          Int
+  promedio          Float // escala 0.0 - 5.0
   materiasInscritas Int
-  materiasPerdidas Int
-  asistenciaPct    Float // 0 - 100
+  materiasPerdidas  Int
+  asistenciaPct     Float // 0 - 100
 
   @@unique([estudianteId, periodoId])
   @@index([periodoId])
@@ -307,15 +314,19 @@ model Retiro {
 // ---------------------------------------------------------------------
 
 model Encuesta {
-  id            String              @id @default(uuid())
-  estudianteId  String
-  estudiante    Estudiante          @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  fecha         DateTime            @default(now())
+  id                String              @id @default(uuid())
+  estudianteId      String
+  estudiante        Estudiante          @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  fecha             DateTime            @default(now())
   /// Consentimiento informado antes de responder (Ley 1581/2012)
-  consentimiento Boolean
-  puntaje       Int?
-  nivel         NivelRiesgo?
-  respuestas    RespuestaEncuesta[]
+  consentimiento    Boolean
+  /// Autoriza que Bienestar lo contacte si el resultado es de riesgo alto
+  autorizaContacto  Boolean             @default(false)
+  puntaje           Int?
+  nivel             NivelRiesgo?
+  /// Puntaje 0-100 por dimensión (económica, académica, motivación, entorno)
+  puntajesDimension Json?
+  respuestas        RespuestaEncuesta[]
 
   @@index([estudianteId])
   @@map("encuestas")
@@ -353,16 +364,19 @@ model PuntajeRiesgo {
 }
 
 model Alerta {
-  id           String       @id @default(uuid())
-  estudianteId String
-  estudiante   Estudiante   @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  creadaPorId  String?
-  creadaPor    Usuario?     @relation(fields: [creadaPorId], references: [id])
-  origen       OrigenAlerta
-  motivo       String
-  estado       EstadoAlerta @default(ABIERTA)
-  creadaEn     DateTime     @default(now())
-  actualizadaEn DateTime    @updatedAt
+  id            String       @id @default(uuid())
+  estudianteId  String
+  estudiante    Estudiante   @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  creadaPorId   String?
+  creadaPor     Usuario?     @relation(fields: [creadaPorId], references: [id])
+  /// Curso desde el que un docente reportó la alerta (opcional)
+  cursoId       String?
+  curso         Curso?       @relation(fields: [cursoId], references: [id], onDelete: SetNull)
+  origen        OrigenAlerta
+  motivo        String
+  estado        EstadoAlerta @default(ABIERTA)
+  creadaEn      DateTime     @default(now())
+  actualizadaEn DateTime     @updatedAt
 
   @@index([estudianteId])
   @@index([estado])
@@ -391,22 +405,83 @@ model Intervencion {
 // ---------------------------------------------------------------------
 
 model ParametroEconomico {
-  id           String             @id @default(uuid())
-  categoria    CategoriaParametro
-  clave        String
-  nombre       String
-  valor        Float
-  unidad       String // COP, %, años, factor...
-  descripcion  String?
-  fuente       String?
+  id               String             @id @default(uuid())
+  categoria        CategoriaParametro
+  clave            String
+  nombre           String
+  valor            Float
+  unidad           String // COP, %, años, factor...
+  descripcion      String?
+  fuente           String?
   /// Si es NULL aplica a toda la universidad; si no, solo a ese programa
-  programaId   String?
-  programa     Programa?          @relation(fields: [programaId], references: [id], onDelete: Cascade)
-  actualizadoEn DateTime          @updatedAt
+  programaId       String?
+  programa         Programa?          @relation(fields: [programaId], references: [id], onDelete: Cascade)
+  actualizadoEn    DateTime           @updatedAt
   actualizadoPorId String?
-  actualizadoPor   Usuario?       @relation(fields: [actualizadoPorId], references: [id])
+  actualizadoPor   Usuario?           @relation(fields: [actualizadoPorId], references: [id])
 
   @@unique([clave, programaId])
   @@index([categoria])
   @@map("parametros_economicos")
+}
+
+// ---------------------------------------------------------------------
+// Fase 2: cursos del periodo (panel docente) y versiones del modelo de riesgo
+// ---------------------------------------------------------------------
+
+model Curso {
+  id         String   @id @default(uuid())
+  codigo     String // "SIS-301"
+  nombre     String
+  /// Semestre del plan de estudios al que pertenece
+  semestre   Int
+  creditos   Int      @default(3)
+  programaId String
+  programa   Programa @relation(fields: [programaId], references: [id])
+  periodoId  String
+  periodo    Periodo  @relation(fields: [periodoId], references: [id])
+  docenteId  String
+  docente    Usuario  @relation(fields: [docenteId], references: [id])
+
+  inscripciones Inscripcion[]
+  alertas       Alerta[]
+
+  @@unique([codigo, periodoId])
+  @@index([docenteId])
+  @@index([periodoId])
+  @@map("cursos")
+}
+
+model Inscripcion {
+  id            String     @id @default(uuid())
+  cursoId       String
+  curso         Curso      @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  estudianteId  String
+  estudiante    Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  /// Nota acumulada del corte en curso (0.0 - 5.0); null si aún no hay calificaciones
+  notaParcial   Float?
+  asistenciaPct Float
+  fallas        Int        @default(0)
+
+  @@unique([cursoId, estudianteId])
+  @@index([estudianteId])
+  @@map("inscripciones")
+}
+
+model ModeloRiesgo {
+  id             String   @id @default(uuid())
+  version        String   @unique
+  /// PYTHON_SKLEARN (script de ml/) o ENTRENAMIENTO_ADMIN (reentrenado desde el panel)
+  origen         String
+  /// Características, medias, desviaciones, coeficientes, intercepto y umbrales
+  definicion     Json
+  /// AUC, Brier, tasa base, matriz de confusión, etc.
+  metricas       Json
+  activo         Boolean  @default(false)
+  creadoEn       DateTime @default(now())
+  entrenadoPorId String?
+  entrenadoPor   Usuario? @relation(fields: [entrenadoPorId], references: [id])
+
+  @@index([activo])
+  @@map("modelos_riesgo")
 }
