@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 33% 98%;
+    --foreground: 215 28% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 14%;
+    --primary: 208 100% 31%; /* UCC azul #00549F */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 25% 94%;
+    --secondary-foreground: 215 28% 20%;
+    --muted: 210 25% 94%;
+    --muted-foreground: 215 14% 38%;
+    --accent: 84 70% 38%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 20% 87%;
+    --input: 214 20% 80%;
+    --ring: 208 100% 31%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+}
+
+/* Gráficas (Recharts): tipografía y rejilla discretas */
+.recharts-cartesian-grid line {
+  stroke: hsl(var(--border));
+}
+.recharts-text {
+  fill: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
