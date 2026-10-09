@@ -15,11 +15,15 @@ export function GraficaFactores({ factores }: { factores: Factor[] }) {
   const datos = factores
     .filter((f) => Math.abs(f.aporte) >= 0.02)
     .slice(0, 8)
-    .map((f) => ({ ...f, nombre: f.etiqueta.length > 34 ? `${f.etiqueta.slice(0, 32)}…` : f.etiqueta, aporte: Math.round(f.aporte * 100) / 100 }));
+    .map((f) => {
+      // La etiqueta incluye el valor del estudiante: "Tiene beca: no" se entiende; "Tiene beca" sola confunde
+      const corta = ModeloRiesgo.etiquetaCorta(f);
+      return { ...f, nombre: corta.length > 46 ? `${corta.slice(0, 44)}…` : corta, aporte: Math.round(f.aporte * 100) / 100 };
+    });
   return (
     <TarjetaGrafica
       titulo="¿Por qué este puntaje?"
-      descripcion="Factores que más alejan a este estudiante de uno promedio. Naranja: aumenta el riesgo. Azul: lo reduce."
+      descripcion="Factores que más alejan a este estudiante de uno promedio, con su valor. Naranja: aumenta el riesgo. Azul: lo reduce."
       nota="La explicación es exacta: la suma de los aportes más el valor base del modelo reconstruye la probabilidad."
       vacio={datos.length === 0}
       tabla={{
@@ -36,7 +40,7 @@ export function GraficaFactores({ factores }: { factores: Factor[] }) {
           <BarChart data={datos} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
             <CartesianGrid horizontal={false} />
             <XAxis type="number" tick={{ fontSize: 12 }} />
-            <YAxis type="category" dataKey="nombre" width={200} tick={{ fontSize: 12 }} />
+            <YAxis type="category" dataKey="nombre" width={230} tick={{ fontSize: 12 }} />
             <ReferenceLine x={0} stroke="#1b2430" />
             <Tooltip
               cursor={{ fill: "rgba(0,84,159,0.06)" }}
