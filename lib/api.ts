@@ -26,14 +26,17 @@ interface Contexto {
 /**
  * Envuelve un handler de API con: autenticación, autorización por rol y manejo uniforme de errores.
  * Un solo lugar para esto evita repetir try/catch y deja las rutas cortas y legibles.
+ * El handler devuelve un objeto (se envía como JSON) o un `Response` (se envía tal cual, p. ej. un archivo).
  */
 export function manejar(roles: Rol[] | null, handler: (ctx: Contexto) => Promise<unknown>) {
-  return async (req: Request, ruta?: { params?: Record<string, string> }): Promise<NextResponse> => {
+  return async (req: Request, ruta?: { params?: Record<string, string> }): Promise<Response> => {
     try {
       const session = await getServerSession(authOptions);
       if (!session) throw new ErrorApi(401, "No autenticado. Inicia sesión para continuar.");
       if (roles && !roles.includes(session.user.rol)) throw new ErrorApi(403, "No tienes permisos para esta operación.");
       const resultado = await handler({ req, session, params: ruta?.params ?? {} });
+      // Un handler puede devolver una respuesta ya armada (p. ej. un archivo PDF o Excel)
+      if (resultado instanceof Response) return resultado;
       return NextResponse.json(resultado);
     } catch (error) {
       return respuestaDeError(error);
