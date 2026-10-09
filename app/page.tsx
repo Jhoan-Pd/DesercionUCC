@@ -9,5 +9,6 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
+  if (session.revocada) redirect("/login?motivo=cuenta-desactivada");
   redirect(rutaInicial(session.user.rol));
 }
