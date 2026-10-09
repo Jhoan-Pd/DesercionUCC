@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ServicioAuditoria } from "@/services/auditoria/ServicioAuditoria";
 import { ErrorApi } from "@/lib/api";
 import type { Rol } from "@/lib/roles";
 import { ServicioParametros } from "@/services/parametros/ServicioParametros";
@@ -65,7 +66,7 @@ export class ServicioImpacto {
     if (!autorizado) throw new ErrorApi(403, "No tienes permiso para consultar datos individuales de otro estudiante.");
     if (!esPropio) {
       // Rastro de auditoría mínimo del acceso a datos personales (habeas data)
-      console.info(`[AUDITORIA] usuario=${solicitante.usuarioId} rol=${solicitante.rol} consulta estudiante=${est.hashAnonimo}`);
+      await new ServicioAuditoria().registrar({ usuarioId: solicitante.usuarioId, rol: solicitante.rol, accion: "CONSULTA_CALCULADORA", recurso: est.hashAnonimo });
     }
 
     const programas = await this.listarProgramas();

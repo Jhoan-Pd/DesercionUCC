@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
+import { ERROR_CUENTA_BLOQUEADA, MAX_INTENTOS, MINUTOS_BLOQUEO } from "@/lib/seguridad/bloqueo";
 
 const esquema = z.object({
   email: z.string().min(1, "Escribe tu correo").email("Correo no válido"),
@@ -31,7 +32,11 @@ export function FormularioLogin({ callbackUrl }: { callbackUrl?: string }) {
     setError(null);
     const res = await signIn("credentials", { ...datos, redirect: false });
     if (!res || res.error) {
-      setError("Correo o contraseña incorrectos, o la cuenta está inactiva.");
+      setError(
+        res?.error === ERROR_CUENTA_BLOQUEADA
+          ? `Por seguridad, la cuenta quedó bloqueada ${MINUTOS_BLOQUEO} minutos tras ${MAX_INTENTOS} intentos fallidos. Intenta más tarde o contacta al administrador.`
+          : "Correo o contraseña incorrectos, o la cuenta está inactiva.",
+      );
       return;
     }
     // La raíz decide el módulo inicial según el rol

@@ -1,4 +1,5 @@
 import type { NivelRiesgo, Prisma } from "@prisma/client";
+import { ServicioAuditoria } from "@/services/auditoria/ServicioAuditoria";
 import { prisma } from "@/lib/prisma";
 import { ErrorApi } from "@/lib/api";
 import type { FiltrosRiesgo } from "@/lib/validators/riesgo";
@@ -194,7 +195,7 @@ export class ServicioRiesgo {
       },
     });
     if (!e) throw new ErrorApi(404, "No se encontró el estudiante.");
-    console.info(`[AUDITORIA] usuario=${solicitante.usuarioId} rol=${solicitante.rol} ficha estudiante=${e.hashAnonimo}`);
+    await new ServicioAuditoria().registrar({ usuarioId: solicitante.usuarioId, rol: solicitante.rol, accion: "CONSULTA_FICHA", recurso: e.hashAnonimo });
 
     const puntaje = e.puntajes[0] ?? null;
     const modelo = await this.modeloActivo();
