@@ -46,5 +46,9 @@ export const config = {
     "/api/alertas/:path*",
     "/api/encuesta/:path*",
     "/api/docente/:path*",
+    "/api/intervenciones/:path*",
+    "/api/impacto-institucional/:path*",
+    "/api/reportes/:path*",
+    "/api/admin/:path*",
   ],
 };
