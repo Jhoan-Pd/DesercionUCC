@@ -225,7 +225,7 @@ export function contenidoIntervenciones(e: EfectividadIntervenciones, ctx: Conte
         hoja: "Por tipo",
         barras: {
           titulo: "Efecto ajustado sobre la permanencia (puntos porcentuales)",
-          formato: "entero",
+          formato: "decimal",
           datos: e.porTipo.filter((t) => t.efectoAjustado !== null).map((t) => ({ etiqueta: TIPO_INTERVENCION[t.tipo] ?? t.tipo, valor: t.efectoAjustado as number })),
         },
         tabla: {

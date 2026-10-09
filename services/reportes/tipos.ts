@@ -41,7 +41,7 @@ export interface BarraReporte {
 
 export interface GraficoBarras {
   titulo: string;
-  formato: "pct" | "cop" | "entero";
+  formato: "pct" | "cop" | "entero" | "decimal";
   datos: BarraReporte[];
 }
 

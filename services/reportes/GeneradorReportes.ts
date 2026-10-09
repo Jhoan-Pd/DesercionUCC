@@ -13,6 +13,7 @@ const GRIS_FILA = "FFF2F6FA";
 const RGB_AZUL: [number, number, number] = [0, 84, 159];
 const RGB_AZUL_OSCURO: [number, number, number] = [0, 58, 112];
 const RGB_VERDE: [number, number, number] = [111, 168, 28];
+const RGB_NARANJA: [number, number, number] = [235, 104, 52];
 const RGB_TINTA: [number, number, number] = [27, 36, 48];
 const RGB_GRIS: [number, number, number] = [95, 105, 118];
 const RGB_BORDE: [number, number, number] = [214, 222, 232];
@@ -254,17 +255,24 @@ export class GeneradorReportes {
     const anchoValor = 70;
     const anchoBarra = util - anchoEtiqueta - anchoValor;
     const maximo = Math.max(...datos.map((d) => Math.abs(d.valor)), 1e-9);
-    const formato = grafico.formato === "entero" ? "entero" : grafico.formato;
+    const formato = grafico.formato;
+    const hayNegativos = datos.some((d) => d.valor < 0);
     for (const d of datos) {
       doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(...RGB_TINTA);
       const etiqueta = doc.splitTextToSize(textoPdf(d.etiqueta), anchoEtiqueta - 8)[0] ?? "";
       doc.text(etiqueta, MARGEN, y + 9);
       const largo = Math.max(1, (Math.abs(d.valor) / maximo) * anchoBarra);
-      doc.setFillColor(...RGB_AZUL);
+      // Un valor negativo (p. ej. un efecto que empeora la permanencia) se distingue por color
+      doc.setFillColor(...(d.valor < 0 ? RGB_NARANJA : RGB_AZUL));
       doc.roundedRect(MARGEN + anchoEtiqueta, y + 2, largo, altoFila - 5, 1.5, 1.5, "F");
       doc.setTextColor(...RGB_TINTA);
       doc.text(textoPdf(formatearCelda(d.valor, formato)), MARGEN + anchoEtiqueta + largo + 4, y + 9);
       y += altoFila;
+    }
+    if (hayNegativos) {
+      doc.setFont("helvetica", "italic").setFontSize(7.5).setTextColor(...RGB_GRIS);
+      doc.text(textoPdf("Barras naranjas: valores negativos (la longitud representa la magnitud)."), MARGEN, y + 8);
+      y += 12;
     }
     return y;
   }

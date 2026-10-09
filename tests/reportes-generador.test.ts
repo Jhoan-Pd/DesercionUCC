@@ -121,3 +121,12 @@ describe("GeneradorReportes → PDF", () => {
     expect(g.nombreArchivo("xlsx")).toBe("observatorio-institucional-2026-10-09.xlsx");
   });
 });
+
+describe("GeneradorReportes → barras con valores negativos", () => {
+  it("genera el PDF cuando hay efectos negativos y decimales", () => {
+    const d = datos();
+    d.secciones = [{ titulo: "Efecto", barras: { titulo: "Efecto (pp)", formato: "decimal", datos: [{ etiqueta: "Tutoría", valor: 6.1 }, { etiqueta: "Psicológico", valor: -3.4 }] } }];
+    const pdf = new GeneradorReportes(d).aPdf();
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+  });
+});
