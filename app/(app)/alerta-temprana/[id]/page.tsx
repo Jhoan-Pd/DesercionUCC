@@ -14,6 +14,7 @@ import { GraficaFactores } from "@/components/riesgo/GraficaFactores";
 import { GraficaHistorial } from "@/components/riesgo/GraficaHistorial";
 import { GestorAlertas } from "@/components/riesgo/GestorAlertas";
 import { BarrasDimension } from "@/components/encuesta/BarrasDimension";
+import { RegistrarIntervencion } from "@/components/intervenciones/RegistrarIntervencion";
 import { formatoCOP } from "@/lib/utils";
 
 export const metadata = { title: "Ficha de riesgo" };
@@ -131,9 +132,14 @@ export default async function FichaRiesgoPage({ params }: { params: { id: string
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Intervenciones</CardTitle>
-              <CardDescription>Acciones de acompañamiento registradas por Bienestar.</CardDescription>
+            <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+              <div className="space-y-1">
+                <CardTitle>Intervenciones</CardTitle>
+                <CardDescription>Acciones de acompañamiento registradas por Bienestar.</CardDescription>
+              </div>
+              {(e.estado === "ACTIVO" || e.estado === "APLAZADO") && (
+                <RegistrarIntervencion estudianteId={e.id} variante="outline" alertas={d.alertas.filter((a) => a.estado !== "CERRADA").map((a) => ({ id: a.id, motivo: a.motivo }))} />
+              )}
             </CardHeader>
             <CardContent>
               {d.intervenciones.length === 0 ? (
