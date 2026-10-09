@@ -56,3 +56,37 @@ export function nombreArchivo(tipo: string, fecha: Date, extension: string): str
   const partes = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).format(fecha);
   return `observatorio-${tipo}-${partes}.${extension}`;
 }
+
+/** Caracteres fuera del rango Latin-1 que sí existen en la codificación WinAnsi de las fuentes estándar del PDF */
+const EXTRAS_WINANSI = new Set("€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ");
+const REEMPLAZOS_PDF: Record<string, string> = {
+  "≥": ">=",
+  "≤": "<=",
+  "≠": "!=",
+  "−": "-",
+  "→": "->",
+  "←": "<-",
+  "✓": "Sí",
+  "✗": "No",
+  "₁": "1",
+  "₂": "2",
+  "√": "raíz",
+  "Δ": "Delta",
+  " ": " ",
+  " ": " ",
+};
+
+/**
+ * Adapta un texto a las fuentes estándar del PDF (Helvetica, codificación WinAnsi):
+ * conserva tildes, ñ, ¿, ¡, comillas y rayas, y traduce símbolos como ≥ o → que la fuente no tiene.
+ */
+export function textoPdf(texto: string): string {
+  let salida = "";
+  for (const ch of texto) {
+    const codigo = ch.codePointAt(0)!;
+    if (REEMPLAZOS_PDF[ch] !== undefined) salida += REEMPLAZOS_PDF[ch];
+    else if ((codigo >= 0x20 && codigo <= 0x7e) || (codigo >= 0xa1 && codigo <= 0xff) || EXTRAS_WINANSI.has(ch) || ch === "\n") salida += ch;
+    else salida += "?";
+  }
+  return salida;
+}
