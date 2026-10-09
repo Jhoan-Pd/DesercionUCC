@@ -35,8 +35,8 @@ export function FormularioLogin({ callbackUrl }: { callbackUrl?: string }) {
       return;
     }
     // La raíz decide el módulo inicial según el rol
-    // Solo rutas internas: "//otro-sitio.com" también empieza por "/" (evita redirección abierta)
-    const destino = callbackUrl && callbackUrl.startsWith("/") && !callbackUrl.startsWith("//") ? callbackUrl : "/";
+    // Solo rutas internas "/algo": se rechazan "//sitio" y "/\\sitio", que el navegador trata como otro dominio (redirección abierta)
+    const destino = callbackUrl && /^\/(?![\/\\])/.test(callbackUrl) ? callbackUrl : "/";
     router.push(destino);
     router.refresh();
   }

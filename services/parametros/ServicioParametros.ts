@@ -32,7 +32,8 @@ export class ServicioParametros {
   async listar(): Promise<ParametroDTO[]> {
     const filas = await prisma.parametroEconomico.findMany({
       include: { programa: { select: { nombre: true } } },
-      orderBy: [{ categoria: "asc" }, { nombre: "asc" }],
+      // Globales primero (SMMLV, bachiller...), luego los propios de cada programa
+      orderBy: [{ categoria: "asc" }, { programaId: { sort: "asc", nulls: "first" } }, { nombre: "asc" }],
     });
     return filas.map((p) => ({
       id: p.id,
