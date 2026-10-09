@@ -1,0 +1,412 @@
+// =====================================================================
+// Observatorio de Deserción UCC — Esquema de base de datos (PostgreSQL)
+// =====================================================================
+// Decisiones clave (para sustentar):
+//  - IDs uuid: evitan enumeración de registros y permiten generarlos en el seed
+//    antes de insertar (createMany masivo con relaciones consistentes).
+//  - Montos en pesos colombianos como Int (COP no usa decimales en la práctica).
+//  - Roles en tabla propia (normalizada): permite agregar roles sin migrar enums.
+//  - Datos personales mínimos + hash anónimo por estudiante para reportes (Ley 1581/2012).
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------
+
+enum EstadoEstudiante {
+  ACTIVO
+  GRADUADO
+  DESERTOR
+  APLAZADO
+}
+
+enum Sexo {
+  F
+  M
+  O
+}
+
+enum TipoFinanciacion {
+  RECURSOS_PROPIOS
+  ICETEX
+  BECA
+  CREDITO_UCC
+}
+
+/// Categorías de determinantes de deserción según el MEN (SPADIES)
+enum CategoriaCausa {
+  INDIVIDUAL
+  ACADEMICA
+  SOCIOECONOMICA
+  INSTITUCIONAL
+}
+
+enum NivelRiesgo {
+  BAJO
+  MEDIO
+  ALTO
+}
+
+enum EstadoAlerta {
+  ABIERTA
+  EN_SEGUIMIENTO
+  CERRADA
+}
+
+enum OrigenAlerta {
+  DOCENTE
+  MODELO
+  ENCUESTA
+  BIENESTAR
+}
+
+enum TipoIntervencion {
+  TUTORIA
+  APOYO_ECONOMICO
+  ACOMPANAMIENTO_PSICOLOGICO
+  ORIENTACION_VOCACIONAL
+  OTRO
+}
+
+enum EstadoIntervencion {
+  EN_CURSO
+  COMPLETADA
+  CANCELADA
+}
+
+enum DimensionEncuesta {
+  ECONOMICA
+  ACADEMICA
+  MOTIVACION
+  ENTORNO
+}
+
+enum CategoriaParametro {
+  SALARIO
+  COSTO
+  FINANCIERO
+  ESCENARIO
+  SPADIES
+}
+
+// ---------------------------------------------------------------------
+// Usuarios y roles
+// ---------------------------------------------------------------------
+
+model Rol {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @unique // ADMIN | BIENESTAR | DOCENTE | ESTUDIANTE
+  descripcion String
+  usuarios    Usuario[]
+
+  @@map("roles")
+}
+
+model Usuario {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  nombre       String
+  passwordHash String
+  activo       Boolean   @default(true)
+  rolId        Int
+  rol          Rol       @relation(fields: [rolId], references: [id])
+  /// Si el usuario es ESTUDIANTE, enlaza con su registro académico
+  estudianteId String?   @unique
+  estudiante   Estudiante? @relation(fields: [estudianteId], references: [id])
+  creadoEn     DateTime  @default(now())
+  ultimoAcceso DateTime?
+
+  alertasCreadas  Alerta[]
+  intervenciones  Intervencion[]
+  parametrosEditados ParametroEconomico[]
+
+  @@index([rolId])
+  @@map("usuarios")
+}
+
+// ---------------------------------------------------------------------
+// Catálogos académicos
+// ---------------------------------------------------------------------
+
+model Programa {
+  id                 String  @id @default(uuid())
+  nombre             String  @unique
+  facultad           String
+  duracionSemestres  Int
+  /// Valor de matrícula por semestre (COP)
+  valorSemestre      Int
+  activo             Boolean @default(true)
+
+  estudiantes Estudiante[]
+  parametros  ParametroEconomico[]
+
+  @@map("programas")
+}
+
+model Periodo {
+  id          String   @id @default(uuid())
+  codigo      String   @unique // "2024-1"
+  anio        Int
+  semestre    Int // 1 o 2
+  /// Posición cronológica (0 = 2018-1). Facilita cálculos de cohorte/supervivencia
+  indice      Int      @unique
+  fechaInicio DateTime
+  fechaFin    DateTime
+  activo      Boolean  @default(false)
+
+  matriculas       Matricula[]
+  notas            NotaSemestre[]
+  retiros          Retiro[]
+  estudiantesIngreso Estudiante[]
+  puntajes         PuntajeRiesgo[]
+
+  @@map("periodos")
+}
+
+// ---------------------------------------------------------------------
+// Estudiantes y su trayectoria
+// ---------------------------------------------------------------------
+
+model Estudiante {
+  id                  String           @id @default(uuid())
+  codigo              String           @unique
+  /// Identificador anonimizado para reportes y exportaciones
+  hashAnonimo         String           @unique
+  nombres             String
+  apellidos           String
+  sexo                Sexo
+  edadIngreso         Int
+  estrato             Int
+  municipioOrigen     String
+  departamentoOrigen  String
+  trabaja             Boolean          @default(false)
+  horasTrabajoSemana  Int              @default(0)
+  programaId          String
+  programa            Programa         @relation(fields: [programaId], references: [id])
+  periodoIngresoId    String
+  periodoIngreso      Periodo          @relation(fields: [periodoIngresoId], references: [id])
+  /// Cohorte denormalizada ("2021-1") para filtros y agrupaciones rápidas
+  cohorte             String
+  cohorteAnio         Int
+  semestreActual      Int
+  estado              EstadoEstudiante @default(ACTIVO)
+  /// Habeas data (Ley 1581/2012): consentimiento para tratamiento de datos
+  consentimientoDatos Boolean          @default(false)
+  fechaConsentimiento DateTime?
+  creadoEn            DateTime         @default(now())
+
+  usuario        Usuario?
+  matriculas     Matricula[]
+  notas          NotaSemestre[]
+  financiaciones Financiacion[]
+  retiro         Retiro?
+  encuestas      Encuesta[]
+  puntajes       PuntajeRiesgo[]
+  alertas        Alerta[]
+  intervenciones Intervencion[]
+
+  @@index([programaId])
+  @@index([cohorte])
+  @@index([estado])
+  @@index([municipioOrigen])
+  @@map("estudiantes")
+}
+
+model Matricula {
+  id            String     @id @default(uuid())
+  estudianteId  String
+  estudiante    Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  periodoId     String
+  periodo       Periodo    @relation(fields: [periodoId], references: [id])
+  /// Número de semestre académico cursado (1, 2, 3...)
+  semestre      Int
+  valorMatricula Int
+
+  @@unique([estudianteId, periodoId])
+  @@index([periodoId])
+  @@map("matriculas")
+}
+
+model NotaSemestre {
+  id               String     @id @default(uuid())
+  estudianteId     String
+  estudiante       Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  periodoId        String
+  periodo          Periodo    @relation(fields: [periodoId], references: [id])
+  semestre         Int
+  promedio         Float // escala 0.0 - 5.0
+  materiasInscritas Int
+  materiasPerdidas Int
+  asistenciaPct    Float // 0 - 100
+
+  @@unique([estudianteId, periodoId])
+  @@index([periodoId])
+  @@map("notas_semestre")
+}
+
+model Financiacion {
+  id                 String           @id @default(uuid())
+  estudianteId       String
+  estudiante         Estudiante       @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  tipo               TipoFinanciacion
+  /// Porción de la matrícula cubierta por esta fuente (0-100)
+  porcentajeCubierto Int
+  /// Total financiado a lo largo de la carrera (COP)
+  montoTotal         Int
+  /// Deuda vigente (ICETEX / crédito UCC). 0 para becas y recursos propios
+  saldoPendiente     Int              @default(0)
+  /// Tasa efectiva anual de la deuda (ej. 0.11 = 11%)
+  tasaEA             Float            @default(0)
+  plazoMeses         Int              @default(0)
+
+  @@index([estudianteId])
+  @@index([tipo])
+  @@map("financiacion")
+}
+
+model CausaDesercion {
+  id          String         @id @default(uuid())
+  nombre      String         @unique
+  categoria   CategoriaCausa
+  descripcion String?
+  retiros     Retiro[]
+
+  @@map("causas_desercion")
+}
+
+model Retiro {
+  id             String         @id @default(uuid())
+  estudianteId   String         @unique
+  estudiante     Estudiante     @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  periodoId      String
+  periodo        Periodo        @relation(fields: [periodoId], references: [id])
+  /// Último semestre cursado antes de retirarse
+  semestreRetiro Int
+  fechaRetiro    DateTime
+  causaId        String
+  causa          CausaDesercion @relation(fields: [causaId], references: [id])
+  observacion    String?
+
+  @@index([periodoId])
+  @@index([causaId])
+  @@map("retiros")
+}
+
+// ---------------------------------------------------------------------
+// Encuestas, riesgo, alertas e intervenciones (se usan desde la Fase 2)
+// ---------------------------------------------------------------------
+
+model Encuesta {
+  id            String              @id @default(uuid())
+  estudianteId  String
+  estudiante    Estudiante          @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  fecha         DateTime            @default(now())
+  /// Consentimiento informado antes de responder (Ley 1581/2012)
+  consentimiento Boolean
+  puntaje       Int?
+  nivel         NivelRiesgo?
+  respuestas    RespuestaEncuesta[]
+
+  @@index([estudianteId])
+  @@map("encuestas")
+}
+
+model RespuestaEncuesta {
+  id         String            @id @default(uuid())
+  encuestaId String
+  encuesta   Encuesta          @relation(fields: [encuestaId], references: [id], onDelete: Cascade)
+  clave      String // identificador de la pregunta
+  dimension  DimensionEncuesta
+  valor      Int // escala Likert 1-5
+  texto      String?
+
+  @@index([encuestaId])
+  @@map("respuestas_encuesta")
+}
+
+model PuntajeRiesgo {
+  id            String      @id @default(uuid())
+  estudianteId  String
+  estudiante    Estudiante  @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  periodoId     String?
+  periodo       Periodo?    @relation(fields: [periodoId], references: [id])
+  puntaje       Int // 0-100
+  nivel         NivelRiesgo
+  /// Aporte de cada factor al puntaje (explicabilidad)
+  factores      Json
+  modeloVersion String
+  calculadoEn   DateTime    @default(now())
+
+  @@index([estudianteId])
+  @@index([nivel])
+  @@map("puntajes_riesgo")
+}
+
+model Alerta {
+  id           String       @id @default(uuid())
+  estudianteId String
+  estudiante   Estudiante   @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  creadaPorId  String?
+  creadaPor    Usuario?     @relation(fields: [creadaPorId], references: [id])
+  origen       OrigenAlerta
+  motivo       String
+  estado       EstadoAlerta @default(ABIERTA)
+  creadaEn     DateTime     @default(now())
+  actualizadaEn DateTime    @updatedAt
+
+  @@index([estudianteId])
+  @@index([estado])
+  @@map("alertas")
+}
+
+model Intervencion {
+  id            String             @id @default(uuid())
+  estudianteId  String
+  estudiante    Estudiante         @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  responsableId String
+  responsable   Usuario            @relation(fields: [responsableId], references: [id])
+  tipo          TipoIntervencion
+  fecha         DateTime           @default(now())
+  descripcion   String
+  montoApoyo    Int?
+  estado        EstadoIntervencion @default(EN_CURSO)
+
+  @@index([estudianteId])
+  @@index([tipo])
+  @@map("intervenciones")
+}
+
+// ---------------------------------------------------------------------
+// Parámetros editables por el ADMIN (salarios OLE, costos, SPADIES, escenarios)
+// ---------------------------------------------------------------------
+
+model ParametroEconomico {
+  id           String             @id @default(uuid())
+  categoria    CategoriaParametro
+  clave        String
+  nombre       String
+  valor        Float
+  unidad       String // COP, %, años, factor...
+  descripcion  String?
+  fuente       String?
+  /// Si es NULL aplica a toda la universidad; si no, solo a ese programa
+  programaId   String?
+  programa     Programa?          @relation(fields: [programaId], references: [id], onDelete: Cascade)
+  actualizadoEn DateTime          @updatedAt
+  actualizadoPorId String?
+  actualizadoPor   Usuario?       @relation(fields: [actualizadoPorId], references: [id])
+
+  @@unique([clave, programaId])
+  @@index([categoria])
+  @@map("parametros_economicos")
+}
