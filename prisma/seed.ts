@@ -8,6 +8,13 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { generarDataset } from "./seed/generador";
+import { generarCursos, type DocenteSeed } from "./seed/academico";
+import { Aleatorio, acotar } from "./seed/aleatorio";
+import { cargarRegistros } from "../services/riesgo/registros";
+import { ModeloRiesgo } from "../services/riesgo/ModeloRiesgo";
+import { MODELO_BASE, factoresParaGuardar, motivoAlertaModelo, puntuarRegistros } from "../services/riesgo/puntuacion";
+import { EvaluadorEncuesta } from "../services/encuesta/EvaluadorEncuesta";
+import { PREGUNTAS } from "../services/encuesta/preguntas";
 
 const prisma = new PrismaClient();
 
@@ -24,10 +31,13 @@ async function main() {
 
   console.log("🧹 Limpiando datos existentes...");
   await prisma.$transaction([
+    prisma.inscripcion.deleteMany(),
     prisma.respuestaEncuesta.deleteMany(),
     prisma.encuesta.deleteMany(),
     prisma.puntajeRiesgo.deleteMany(),
     prisma.alerta.deleteMany(),
+    prisma.curso.deleteMany(),
+    prisma.modeloRiesgo.deleteMany(),
     prisma.intervencion.deleteMany(),
     prisma.retiro.deleteMany(),
     prisma.financiacion.deleteMany(),
@@ -96,11 +106,122 @@ async function main() {
     ],
   });
 
+  // ------------------------------------------------------------------
+  // Fase 2: docentes, cursos del periodo, modelo de riesgo, puntajes, alertas y encuestas
+  // ------------------------------------------------------------------
+  console.log("👩‍🏫 Creando docentes, cursos e inscripciones del periodo en curso...");
+  const nombresDocentes = [
+    "María Fernanda Rosero", "Carlos Andrés Burbano", "Diana Lucía Erazo", "Jorge Eduardo Benavides",
+    "Paola Andrea Muñoz", "Andrés Felipe Guerrero", "Lina Marcela Ortega", "Juan Pablo Insuasty",
+  ];
+  await prisma.usuario.createMany({
+    data: nombresDocentes.map((nombre, i) => ({ email: `docente${i + 2}@ucc.edu.co`, nombre, passwordHash, rolId: rolId("DOCENTE") })),
+  });
+  const usuariosDocentes = await prisma.usuario.findMany({ where: { rol: { nombre: "DOCENTE" } }, select: { id: true, email: true } });
+  const docentes: DocenteSeed[] = usuariosDocentes.map((u) => ({ id: u.id, demo: u.email === "docente@ucc.edu.co" }));
+  const { cursos, inscripciones } = generarCursos(d, docentes);
+  await prisma.curso.createMany({ data: cursos });
+  await insertarPorLotes(inscripciones, (data) => prisma.inscripcion.createMany({ data }));
+
+  console.log("🧠 Registrando el modelo de riesgo y calculando puntajes...");
+  const modelo = new ModeloRiesgo(MODELO_BASE.definicion);
+  await prisma.modeloRiesgo.create({
+    data: {
+      version: modelo.version,
+      origen: modelo.definicion.origen,
+      definicion: modelo.definicion,
+      metricas: MODELO_BASE.metricas as object,
+      activo: true,
+    },
+  });
+  const periodoActual = d.periodos.find((p) => p.activo)!;
+  const registros = await cargarRegistros(prisma, { soloEstados: ["ACTIVO", "APLAZADO"] });
+  const puntajes = puntuarRegistros(modelo, registros);
+  await insertarPorLotes(puntajes, (lote) =>
+    prisma.puntajeRiesgo.createMany({
+      data: lote.map((p) => ({
+        estudianteId: p.estudianteId,
+        periodoId: periodoActual.id,
+        puntaje: p.prediccion.puntaje,
+        nivel: p.prediccion.nivel,
+        factores: factoresParaGuardar(p.prediccion) as unknown as object,
+        modeloVersion: modelo.version,
+      })),
+    }),
+  );
+
+  const r = new Aleatorio(2028);
+  const enPeriodo = (fraccion: number) => new Date(periodoActual.fechaInicio.getTime() + (Date.UTC(2026, 9, 5) - periodoActual.fechaInicio.getTime()) * fraccion);
+  const altos = puntajes.filter((p) => p.prediccion.nivel === "ALTO");
+  await prisma.alerta.createMany({
+    data: altos.map((p) => ({
+      estudianteId: p.estudianteId,
+      origen: "MODELO" as const,
+      motivo: motivoAlertaModelo(p.prediccion),
+      estado: r.bernoulli(0.35) ? ("EN_SEGUIMIENTO" as const) : ("ABIERTA" as const),
+      creadaEn: enPeriodo(r.rango(0.3, 0.6)),
+    })),
+  });
+
+  // Alertas reportadas por el docente demo (solo algunas: el resto queda para probar el panel)
+  const docenteDemo = docentes.find((x) => x.demo)!;
+  const cursosDemo = new Set(cursos.filter((c) => c.docenteId === docenteDemo.id).map((c) => c.id));
+  const nombreCurso = new Map(cursos.map((c) => [c.id, `${c.codigo} ${c.nombre}`]));
+  const criticas = inscripciones.filter((i) => cursosDemo.has(i.cursoId) && ((i.notaParcial ?? 5) < 2.8 || i.asistenciaPct < 72));
+  const reportadas = criticas.filter((_, i) => i % 2 === 0).slice(0, 8);
+  await prisma.alerta.createMany({
+    data: reportadas.map((i) => ({
+      estudianteId: i.estudianteId,
+      creadaPorId: docenteDemo.id,
+      cursoId: i.cursoId,
+      origen: "DOCENTE" as const,
+      motivo: `${(i.notaParcial ?? 5) < 2.8 ? `Nota parcial de ${i.notaParcial?.toLocaleString("es-CO")}` : `Asistencia del ${i.asistenciaPct.toLocaleString("es-CO")} %`} en ${nombreCurso.get(i.cursoId)}.`,
+      creadaEn: enPeriodo(r.rango(0.6, 0.9)),
+    })),
+  });
+
+  // Encuestas de autoevaluación de una muestra de estudiantes activos (no del estudiante demo)
+  console.log("📝 Generando encuestas de autoevaluación de ejemplo...");
+  const muestra = puntajes.filter((p) => p.estudianteId !== candidatoDemo?.id && r.bernoulli(0.18));
+  let alertasEncuesta = 0;
+  for (const p of muestra) {
+    const latente = acotar(p.prediccion.probabilidad * 2.2 + r.normal(0, 0.12), 0, 1);
+    const respuestas = Object.fromEntries(
+      PREGUNTAS.map((q) => {
+        const riesgo = acotar(latente + r.normal(0, 0.22), 0, 1);
+        const v = 1 + Math.round(riesgo * 4);
+        return [q.clave, q.invertida ? 6 - v : v];
+      }),
+    );
+    const res = EvaluadorEncuesta.evaluar(respuestas);
+    const autoriza = r.bernoulli(0.7);
+    const fecha = enPeriodo(r.rango(0.2, 0.95));
+    await prisma.encuesta.create({
+      data: {
+        estudianteId: p.estudianteId,
+        fecha,
+        consentimiento: true,
+        autorizaContacto: autoriza,
+        puntaje: res.puntaje,
+        nivel: res.nivel,
+        puntajesDimension: res.puntajesDimension,
+        respuestas: { create: PREGUNTAS.map((q) => ({ clave: q.clave, dimension: q.dimension, valor: respuestas[q.clave] })) },
+      },
+    });
+    if (res.nivel === "ALTO" && autoriza) {
+      alertasEncuesta++;
+      await prisma.alerta.create({
+        data: { estudianteId: p.estudianteId, origen: "ENCUESTA", motivo: `Encuesta de autoevaluación con riesgo ALTO (${res.puntaje}/100). Dimensión más crítica: ${res.dimensionesCriticas[0].toLowerCase()}.`, creadaEn: fecha },
+      });
+    }
+  }
+  console.log(`   Cursos: ${cursos.length} · Inscripciones: ${inscripciones.length} · Puntajes: ${puntajes.length} (ALTO ${altos.length}) · Encuestas: ${muestra.length} (alertas ${alertasEncuesta})`);
+
   const desertores = d.estudiantes.filter((e) => e.estado === "DESERTOR").length;
   console.log("\n✅ Seed completado en", ((Date.now() - inicio) / 1000).toFixed(1), "s");
   console.log(`   Estudiantes: ${d.estudiantes.length} (desertores: ${desertores}, tasa acumulada ${((100 * desertores) / d.estudiantes.length).toFixed(1)}%)`);
   console.log(`   Matrículas: ${d.matriculas.length} · Notas: ${d.notas.length} · Retiros: ${d.retiros.length}`);
-  console.log("   Usuarios demo: admin@ucc.edu.co, bienestar@ucc.edu.co, docente@ucc.edu.co, estudiante@ucc.edu.co");
+  console.log("   Usuarios demo: admin@ucc.edu.co, bienestar@ucc.edu.co, docente@ucc.edu.co (y docente2..docente9), estudiante@ucc.edu.co");
   console.log("   Contraseña: la definida en SEED_DEMO_PASSWORD (.env)");
 }
 
