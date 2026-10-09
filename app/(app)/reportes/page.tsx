@@ -41,7 +41,7 @@ export default async function ReportesPage() {
 
       <PanelReportes programas={programas} />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <Card>
           <CardHeader className="flex-row items-start gap-3 space-y-0">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-ucc-verde" aria-hidden />

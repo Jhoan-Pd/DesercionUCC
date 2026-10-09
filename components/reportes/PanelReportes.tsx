@@ -73,7 +73,7 @@ export function PanelReportes({ programas }: { programas: { id: string; nombre: 
 
       {error && <Alert variant="error" titulo="No se pudo generar el reporte">{error}</Alert>}
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {REPORTES.map((r) => (
           <Card key={r.tipo} className="flex flex-col">
             <CardHeader className="flex-row items-start gap-3 space-y-0">
