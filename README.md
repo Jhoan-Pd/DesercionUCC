@@ -4,7 +4,7 @@ Sistema web que **mide el impacto de desertar** de la educación superior y ayud
 
 Proyecto final de la asignatura *Programación Orientada a la Web*.
 
-> **Estado actual: Fase 1 (revisión del 50 %).** Base de datos, datos sintéticos, autenticación por roles, dashboard institucional y calculadora de impacto. Las fases 2 y 3 aparecen en el menú como "Fase 2/3".
+> **Estado actual: Fase 2 completa.** Además de la Fase 1 (BD, datos sintéticos, autenticación por roles, dashboard institucional y calculadora de impacto), ya funcionan el **modelo de riesgo** (regresión logística entrenada en Python), la **alerta temprana**, la **encuesta de autoevaluación** y el **panel docente**. Los módulos de la Fase 3 aparecen en el menú como "Fase 3".
 
 ![Dashboard institucional](docs/capturas/dashboard.png)
 
@@ -34,7 +34,7 @@ Las decisiones de retiro suelen tomarse sin dimensionar estos costos y las alert
 | Fase | Contenido | Estado |
 |---|---|---|
 | **1** | Proyecto, BD con Prisma y seed sintético, auth con roles, dashboard institucional, calculadora de impacto, despliegue en Vercel | ✅ Lista |
-| 2 | Modelo de riesgo (regresión logística), alerta temprana, encuesta del estudiante, panel docente | Pendiente |
+| **2** | Modelo de riesgo (regresión logística), alerta temprana, encuesta del estudiante, panel docente | ✅ Lista |
 | 3 | Intervenciones y su efectividad, impacto institucional, reportes PDF/Excel, importación CSV, README final | Pendiente |
 
 ---
@@ -71,27 +71,37 @@ observatorio-desercion-ucc/
 │   ├── (app)/                 # Páginas protegidas (layout con menú por rol)
 │   │   ├── dashboard/         # Dashboard institucional (+ loading.tsx)
 │   │   ├── calculadora/       # Calculadora de impacto
+│   │   ├── alerta-temprana/   # Lista priorizada y ficha del estudiante (Bienestar)
+│   │   ├── encuesta/          # Autoevaluación del estudiante
+│   │   ├── panel-docente/     # Señales académicas de los cursos del docente
 │   │   ├── admin/parametros/  # Parámetros editables (ADMIN)
-│   │   └── [modulo]/          # Módulos de fases 2-3 ("próximamente")
-│   ├── api/                   # API REST (auth, dashboard, impacto, parametros)
+│   │   └── [modulo]/          # Módulos de la Fase 3 ("próximamente")
+│   ├── api/                   # API REST (auth, dashboard, impacto, parametros, riesgo, alertas, encuesta, docente)
 │   └── acceso-denegado/
 ├── components/
 │   ├── ui/                    # Componentes estilo shadcn/ui (button, card, input...)
 │   ├── layout/                # Sidebar, formulario de login
 │   ├── dashboard/             # Gráficas, filtros, KPIs
 │   ├── calculadora/           # Formulario y resultados
+│   ├── riesgo/                # Insignia de nivel, gráfica de factores, gestor de alertas
+│   ├── encuesta/              # Formulario Likert y resultado
+│   ├── docente/               # Panel docente
 │   └── admin/                 # Editor de parámetros
 ├── lib/                       # prisma, auth, rbac, roles, utilidades, validadores Zod
 ├── services/                  # Lógica de negocio (POO)
 │   ├── impacto/               # CalculadoraImpacto (pura) + ServicioImpacto
 │   ├── dashboard/             # calculos.ts (puro) + ServicioDashboard
+│   ├── riesgo/                # ModeloRiesgo, EntrenadorLogistico, características, ServicioRiesgo
+│   ├── encuesta/              # Preguntas, EvaluadorEncuesta, ServicioEncuesta
+│   ├── alertas/ · docente/    # ServicioAlertas, ServicioDocente
 │   └── parametros/            # ServicioParametros + conversores
 ├── prisma/
-│   ├── schema.prisma          # 16 tablas
-│   ├── migrations/            # Migración SQL inicial
+│   ├── schema.prisma          # 19 tablas
+│   ├── migrations/            # Migraciones SQL (inicial + Fase 2)
 │   ├── seed.ts                # Inserta los datos
 │   └── seed/                  # Generador sintético (puro y determinista)
-├── tests/                     # Vitest (60 pruebas)
+├── ml/                        # Exportación del panel, entrenamiento scikit-learn, notebook, reporte y modelo JSON
+├── tests/                     # Vitest (99 pruebas)
 ├── docs/                      # Diagrama ER y capturas
 └── middleware.ts              # Protección de rutas por rol
 ```
@@ -104,16 +114,21 @@ observatorio-desercion-ucc/
 | `ServicioImpacto` | Carga perfiles y parámetros, aplica control de acceso individual | `perfilPorPrograma`, `perfilPorEstudiante`, `calcular` |
 | `ServicioDashboard` | Consulta la BD con filtros combinables y arma el resumen | `construirWhere` (estático), `obtenerResumen` |
 | `ServicioParametros` | Lectura y edición de parámetros OLE/SPADIES | `listar`, `actualizar`, `mapa`, `paraCalculadora`, `referenciasSpadies` |
+| `ModeloRiesgo` | Aplica la regresión logística exportada desde Python: probabilidad, puntaje 0-100, nivel y aporte exacto de cada factor | `predecir`, `predecirVector`, `clasificar`, `principalesRiesgos` |
+| `EntrenadorLogistico` | Reentrena la regresión logística en TypeScript (Newton-Raphson con L2), con los mismos coeficientes que scikit-learn | `ajustar` |
+| `ServicioRiesgo` | Recalcula puntajes, genera alertas del modelo, lista priorizada y ficha del estudiante | `recalcular`, `listaPriorizada`, `detalle` |
+| `EvaluadorEncuesta` | Puntaje por dimensión y global de la encuesta, regla de intención de retiro y recursos sugeridos | `validar`, `evaluar` (estáticos) |
+| `ServicioEncuesta` · `ServicioAlertas` · `ServicioDocente` | Encuesta con consentimiento, alertas con control de acceso por curso, señales académicas del docente | `responder`, `crear`, `cambiarEstado`… |
 | `Aleatorio` | Generador pseudoaleatorio con semilla para el seed | `normal`, `bernoulli`, `ponderado` |
 | `ErrorApi` | Errores controlados con código HTTP | — |
 
-> `ModeloRiesgo` (Fase 2) y `GeneradorReportes` (Fase 3) seguirán el mismo patrón.
+> `GeneradorReportes` (Fase 3) seguirá el mismo patrón.
 
 ---
 
 ## 5. Modelo de datos (diagrama entidad-relación)
 
-16 tablas: `roles`, `usuarios`, `programas`, `periodos`, `estudiantes`, `matriculas`, `notas_semestre`, `financiacion`, `retiros`, `causas_desercion`, `encuestas`, `respuestas_encuesta`, `puntajes_riesgo`, `alertas`, `intervenciones`, `parametros_economicos`. Versión completa con todos los atributos: [`docs/diagrama-er.png`](docs/diagrama-er.png) (fuente: [`docs/diagrama-er.mmd`](docs/diagrama-er.mmd)).
+19 tablas: las 16 pedidas (`roles`, `usuarios`, `programas`, `periodos`, `estudiantes`, `matriculas`, `notas_semestre`, `financiacion`, `retiros`, `causas_desercion`, `encuestas`, `respuestas_encuesta`, `puntajes_riesgo`, `alertas`, `intervenciones`, `parametros_economicos`) más 3 de la Fase 2: `cursos` e `inscripciones` (panel docente) y `modelos_riesgo` (versiones del modelo). Versión completa con todos los atributos: [`docs/diagrama-er.png`](docs/diagrama-er.png) (fuente: [`docs/diagrama-er.mmd`](docs/diagrama-er.mmd)).
 
 ```mermaid
 erDiagram
@@ -139,6 +154,12 @@ erDiagram
     USUARIOS ||--o{ INTERVENCIONES : "responsable"
     PROGRAMAS |o--o{ PARAMETROS_ECONOMICOS : "salario propio"
     USUARIOS |o--o{ PARAMETROS_ECONOMICOS : "última edición"
+    PROGRAMAS ||--o{ CURSOS : "ofrece"
+    USUARIOS ||--o{ CURSOS : "docente de"
+    CURSOS ||--o{ INSCRIPCIONES : "tiene"
+    ESTUDIANTES ||--o{ INSCRIPCIONES : "cursa"
+    CURSOS |o--o{ ALERTAS : "reportada desde"
+    USUARIOS |o--o{ MODELOS_RIESGO : "entrenó"
 
     ROLES { int id PK
         string nombre UK }
@@ -210,6 +231,19 @@ erDiagram
         string clave
         float valor
         uuid programaId FK }
+    CURSOS { uuid id PK
+        string codigo
+        uuid docenteId FK
+        uuid periodoId FK }
+    INSCRIPCIONES { uuid id PK
+        uuid cursoId FK
+        uuid estudianteId FK
+        float notaParcial
+        float asistenciaPct }
+    MODELOS_RIESGO { uuid id PK
+        string version UK
+        json definicion
+        boolean activo }
 ```
 
 ---
@@ -255,15 +289,17 @@ Comandos útiles:
 | `npm run build` y `npm start` | Compila y ejecuta en modo producción |
 | `npm run db:studio` | Abre Prisma Studio para ver las tablas |
 | `npm run db:seed` | Vuelve a cargar los datos (borra y recrea) |
+| `npm run ml:dataset` | Exporta el panel estudiante-semestre de la BD a `ml/datos/panel_entrenamiento.csv` |
+| `npm run ml:entrenar` | Entrena el modelo con scikit-learn y escribe `ml/modelo_riesgo.json` y `ml/reporte_modelo.md` (requiere `pip install -r ml/requirements.txt`) |
 
 ### Usuarios demo
 
 | Rol | Correo | Ve |
 |---|---|---|
 | ADMIN | `admin@ucc.edu.co` | Todo + parámetros |
-| BIENESTAR | `bienestar@ucc.edu.co` | Dashboard, calculadora (puede cargar un estudiante por código) |
-| DOCENTE | `docente@ucc.edu.co` | Calculadora y panel docente (Fase 2) |
-| ESTUDIANTE | `estudiante@ucc.edu.co` | Su calculadora con sus datos precargados |
+| BIENESTAR | `bienestar@ucc.edu.co` | Dashboard, alerta temprana (lista y ficha), calculadora con perfil por código |
+| DOCENTE | `docente@ucc.edu.co` | Panel docente con sus 8 cursos del periodo 2026-2 y la calculadora |
+| ESTUDIANTE | `estudiante@ucc.edu.co` | Su calculadora con sus datos precargados y la encuesta de autoevaluación |
 
 La contraseña de todas es la de la variable `SEED_DEMO_PASSWORD` del `.env` (valor de ejemplo en `.env.example`). **Cámbiala antes de compartir la URL pública** y vuelve a correr el seed.
 
@@ -386,6 +422,35 @@ Simplificaciones explícitas: valores en pesos reales (sin inflación); el soste
 
 Todos los supuestos (SMMLV 2026, salarios de enganche del Observatorio Laboral para la Educación por programa, tasas, crecimiento, tasa de descuento, referencias SPADIES) se editan en **Admin → Parámetros** sin tocar código. Los salarios por programa incluidos son **valores de ejemplo**: actualízalos con <https://ole.mineducacion.gov.co> antes de la sustentación final.
 
+### 9.4 Modelo de riesgo (regresión logística)
+
+**Pregunta que responde:** ¿qué probabilidad tiene este estudiante de desertar al terminar el semestre que cursa o el siguiente (un año académico)?
+
+1. **Panel estudiante-semestre** (`services/riesgo/caracteristicas.ts`): una fila por cada semestre cursado, con 21 características que la universidad conoce durante el semestre: promedio, materias perdidas, asistencia, caída del promedio, horas de trabajo, estrato, edad de ingreso, semestre, financiación y programa. **No se usan sexo ni municipio** (evitan sesgos y no son accionables). Los semestres cuyo desenlace aún no se conoce (censurados) se excluyen del entrenamiento.
+2. **Exportación** (`npm run ml:dataset`) → CSV, y **entrenamiento** en Python (`ml/entrenar_modelo.py`): `StandardScaler` + `LogisticRegression(C=1)` de scikit-learn, separación entrenamiento/prueba **por estudiante** (sin fuga de información), validación cruzada de 5 pliegues y comparación contra una regla simple. Se exportan coeficientes, medias y desviaciones a `ml/modelo_riesgo.json`. El análisis completo está en el notebook `ml/modelo_riesgo.ipynb` y en [`ml/reporte_modelo.md`](ml/reporte_modelo.md).
+3. **Predicción en TypeScript** (`ModeloRiesgo`): sin servidor Python en producción. `p = 1/(1+e^-(b₀ + Σ βᵢ·zᵢ))`, puntaje = `round(100·p)`.
+4. **Explicación exacta**: como las variables están estandarizadas, el aporte de cada factor es `βᵢ·zᵢ` (cuánto aleja al estudiante del promedio). La suma de aportes más el intercepto reconstruye la probabilidad; no es una aproximación.
+5. **Reentrenamiento sin Python**: `EntrenadorLogistico` resuelve el mismo problema con Newton-Raphson y una prueba automática verifica que reproduce los coeficientes de scikit-learn.
+
+| Métrica (conjunto de prueba) | Valor |
+|---|---|
+| AUC-ROC | **0,819** (validación cruzada 0,829 ± 0,026) |
+| AUC de la regla "promedio bajo" | 0,753 |
+| Brier | 0,091 |
+| Niveles | BAJO < 11 % · MEDIO 11-29 % · ALTO ≥ 29 % (tasa base 11,4 %) |
+
+### 9.5 Alerta temprana (Bienestar)
+
+Lista priorizada de los estudiantes activos ordenada por puntaje, con nivel (ícono + texto, no solo color), los 3 factores que más pesan, alertas abiertas y filtros por nivel, programa, semestre y búsqueda. Botón para **recalcular** todos los puntajes con el modelo activo (genera alertas automáticas para los de nivel ALTO). La **ficha del estudiante** muestra la gráfica de factores, el historial de notas, los cursos del periodo, la última encuesta y las alertas, cuyo estado (abierta, en seguimiento, cerrada) gestiona Bienestar. Cada consulta individual queda en el registro de auditoría.
+
+### 9.6 Encuesta de autoevaluación (estudiante)
+
+16 preguntas Likert en cuatro dimensiones (económica, académica, motivación y entorno), algunas invertidas para evitar respuestas automáticas. Exige **consentimiento informado** antes de empezar y pregunta si autoriza que Bienestar lo contacte. `EvaluadorEncuesta` calcula el puntaje por dimensión y global (BAJO < 35, MEDIO 35-55, ALTO ≥ 55); si el estudiante declara intención de retirarse, el nivel sube al menos a MEDIO. Al terminar ve su resultado y los **recursos** de la UCC según sus dimensiones más altas (tutorías, becas, apoyo psicológico, bienestar). Solo si el resultado es ALTO **y** autorizó el contacto se crea una alerta para Bienestar.
+
+### 9.7 Panel docente
+
+El docente ve únicamente sus cursos del periodo actual con la nota parcial, asistencia y fallas de cada estudiante, y las **señales** (nota parcial < 3,0 o asistencia < 80 %). Puede reportar una alerta a Bienestar desde cada fila. Por **minimización de datos** no ve el puntaje del modelo ni información socioeconómica, y la API verifica que el estudiante esté inscrito en uno de sus cursos antes de aceptar el reporte.
+
 ---
 
 ## 10. Seguridad y Ley 1581 de 2012 (habeas data)
@@ -394,7 +459,8 @@ Todos los supuestos (SMMLV 2026, salarios de enganche del Observatorio Laboral p
 - **Autorización por rol en dos capas**: `middleware.ts` (antes de renderizar) y cada endpoint (`manejar(roles, …)`). Fuente única de permisos: `lib/rbac.ts`.
 - **Datos individuales** solo para ADMIN y BIENESTAR (y cada estudiante los suyos). Un docente o estudiante que pida el código de otro estudiante recibe solo valores generales. Cada consulta individual de Bienestar/Admin se registra en el log (`[AUDITORIA]`, con el hash anónimo).
 - **Anonimización**: cada estudiante tiene un `hashAnonimo`; el dashboard solo muestra agregados.
-- **Consentimiento**: campos `consentimientoDatos` / `fechaConsentimiento` en estudiantes y `consentimiento` en encuestas (Fase 2).
+- **Consentimiento**: campos `consentimientoDatos` / `fechaConsentimiento` en estudiantes; la encuesta no se puede responder sin consentimiento y la alerta a Bienestar requiere autorización expresa de contacto.
+- **Minimización**: el docente solo ve datos académicos de sus cursos; el puntaje del modelo y los datos socioeconómicos son solo para Bienestar y Administración.
 - **Validación Zod** en cada endpoint con mensajes en español; errores controlados con códigos HTTP correctos (400, 401, 403, 404).
 - El login solo redirige a rutas internas (rechaza `//sitio` y `/\sitio`, evitando redirecciones abiertas).
 - Pendiente para la Fase 3: límite de intentos de inicio de sesión (rate limiting) y tabla de auditoría persistente.
@@ -426,16 +492,19 @@ Todos los supuestos (SMMLV 2026, salarios de enganche del Observatorio Laboral p
 npm test
 ```
 
-**60 pruebas** en 4 archivos:
+**99 pruebas** en 8 archivos:
 
 - `calculadora-impacto.test.ts` (30): inversión, cuota francesa contra un valor verificado, deuda con y sin título, VPN vs nominal, horizontes, punto de equilibrio, escenarios, entradas inválidas.
+- `riesgo-modelo.test.ts` (15): el entrenador TS reproduce los coeficientes de scikit-learn, la explicación reconstruye exactamente la probabilidad, niveles, AUC y métricas.
 - `dashboard-calculos.test.ts` (12): Kaplan-Meier con casos calculados a mano y censura, tasas por cohorte, semestre y periodo, tasa anual, causas y KPIs.
 - `seed-integridad.test.ts` (12): llaves foráneas, unicidad, coherencia estado/retiro, rangos válidos y realismo de la deserción simulada.
+- `riesgo-caracteristicas.test.ts` (11): etiquetas del panel a dos semestres, exclusión de semestres censurados y vectorización.
+- `encuesta.test.ts` (8): puntajes extremos, preguntas invertidas, regla de intención de retiro y validación.
 - `conversores.test.ts` (6): conversión de parámetros y formatos.
+- `seed-academico.test.ts` (5): cursos, docentes e inscripciones coherentes con el periodo en curso.
 
-Además, en la auditoría de la Fase 1 se verificó de punta a punta contra **PostgreSQL 16**: la migración `prisma/migrations` (estructura idéntica al esquema: columnas, tipos, restricciones, índices y enums), seed y re-seed, login de los 4 roles, matriz de permisos de todas las rutas y APIs (69 verificaciones), validaciones con mensajes en español, edición de parámetros reflejada en calculadora y dashboard, y el flujo completo en navegador (Chromium) en escritorio y móvil, sin errores de consola.
+Además, cada fase se verificó de punta a punta contra **PostgreSQL 16**: la migración `prisma/migrations` (estructura idéntica al esquema: columnas, tipos, restricciones, índices y enums), seed y re-seed, login de los 4 roles, matriz de permisos de todas las rutas y APIs (69 verificaciones), validaciones con mensajes en español, edición de parámetros reflejada en calculadora y dashboard, y el flujo completo en navegador (Chromium) en escritorio y móvil, sin errores de consola. En la Fase 2 se añadieron 61 verificaciones de API (lista priorizada, filtros y paginación, ficha, recálculo, alertas, permisos del docente por curso, encuesta con y sin consentimiento) y las pruebas de navegador de los nuevos módulos.
 
-> Nota técnica: el entorno donde se hizo esa verificación no permitía descargar los binarios nativos de Prisma, así que se ejecutó con el motor WASM oficial de Prisma 5.22 y el adaptador `pg`. Es el mismo cliente y las mismas consultas; en tu PC y en Vercel Prisma usa su motor nativo normal y no necesitas hacer nada distinto.
 
 ---
 
@@ -448,6 +517,14 @@ Además, en la auditoría de la Fase 1 se verificó de punta a punta contra **Po
 | Parámetros (Admin) | Móvil |
 |---|---|
 | ![Parámetros](docs/capturas/parametros.png) | ![Móvil](docs/capturas/movil.png) |
+
+| Alerta temprana (Bienestar) | Ficha del estudiante |
+|---|---|
+| ![Alerta temprana](docs/capturas/alerta-temprana.png) | ![Ficha](docs/capturas/ficha-estudiante.png) |
+
+| Panel docente | Encuesta de autoevaluación |
+|---|---|
+| ![Panel docente](docs/capturas/panel-docente.png) | ![Encuesta](docs/capturas/encuesta.png) |
 
 ## 14. Colores institucionales
 
