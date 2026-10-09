@@ -17,7 +17,9 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "ml:dataset": "tsx ml/exportar_dataset.ts",
+    "ml:entrenar": "python ml/entrenar_modelo.py"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
