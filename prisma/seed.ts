@@ -219,11 +219,50 @@ async function main() {
   }
   console.log(`   Cursos: ${cursos.length} · Inscripciones: ${inscripciones.length} · Puntajes: ${puntajes.length} (ALTO ${altos.length}) · Encuestas: ${muestra.length} (alertas ${alertasEncuesta})`);
 
+  // ------------------------------------------------------------------
+  // Fase 3: consejeros de Bienestar, intervenciones históricas y en curso
+  // ------------------------------------------------------------------
+  console.log("🤝 Registrando intervenciones de Bienestar...");
+  await prisma.usuario.createMany({
+    data: [
+      { email: "bienestar2@ucc.edu.co", nombre: "Psicóloga de Bienestar", passwordHash, rolId: rolId("BIENESTAR") },
+      { email: "bienestar3@ucc.edu.co", nombre: "Trabajador social de Bienestar", passwordHash, rolId: rolId("BIENESTAR") },
+    ],
+  });
+  const consejeros = await prisma.usuario.findMany({ where: { rol: { nombre: "BIENESTAR" } }, select: { id: true, nombre: true }, orderBy: { email: "asc" } });
+  const responsablePara = (tipo: string, i: number) =>
+    tipo === "ACOMPANAMIENTO_PSICOLOGICO" ? consejeros[1 % consejeros.length].id : tipo === "APOYO_ECONOMICO" ? consejeros[2 % consejeros.length].id : consejeros[i % consejeros.length].id;
+  await insertarPorLotes(d.intervenciones, (lote) =>
+    prisma.intervencion.createMany({
+      data: lote.map((iv, i) => ({ ...iv, responsableId: responsablePara(iv.tipo, i), estado: "COMPLETADA" as const })),
+    }),
+  );
+
+  // En el periodo actual, Bienestar ya atiende parte de las alertas que están "en seguimiento"
+  const enSeguimiento = await prisma.alerta.findMany({ where: { estado: "EN_SEGUIMIENTO" }, select: { id: true, estudianteId: true, origen: true, creadaEn: true } });
+  const tiposActuales = ["TUTORIA", "APOYO_ECONOMICO", "ACOMPANAMIENTO_PSICOLOGICO", "ORIENTACION_VOCACIONAL"] as const;
+  const actuales = enSeguimiento.filter(() => r.bernoulli(0.6)).map((a, i) => {
+    const tipo = tiposActuales[i % tiposActuales.length];
+    return {
+      estudianteId: a.estudianteId,
+      responsableId: responsablePara(tipo, i),
+      tipo,
+      fecha: new Date(a.creadaEn.getTime() + 3 * 86_400_000),
+      descripcion: `Intervención abierta a partir de la alerta (${a.origen.toLowerCase()}).`,
+      montoApoyo: tipo === "APOYO_ECONOMICO" ? 1_500_000 : null,
+      estado: "EN_CURSO" as const,
+      periodoId: periodoActual.id,
+      alertaId: a.id,
+    };
+  });
+  await prisma.intervencion.createMany({ data: actuales });
+  console.log(`   Intervenciones: ${d.intervenciones.length} históricas · ${actuales.length} en curso`);
+
   const desertores = d.estudiantes.filter((e) => e.estado === "DESERTOR").length;
   console.log("\n✅ Seed completado en", ((Date.now() - inicio) / 1000).toFixed(1), "s");
   console.log(`   Estudiantes: ${d.estudiantes.length} (desertores: ${desertores}, tasa acumulada ${((100 * desertores) / d.estudiantes.length).toFixed(1)}%)`);
   console.log(`   Matrículas: ${d.matriculas.length} · Notas: ${d.notas.length} · Retiros: ${d.retiros.length}`);
-  console.log("   Usuarios demo: admin@ucc.edu.co, bienestar@ucc.edu.co, docente@ucc.edu.co (y docente2..docente9), estudiante@ucc.edu.co");
+  console.log("   Usuarios demo: admin@ucc.edu.co, bienestar@ucc.edu.co (y bienestar2, bienestar3), docente@ucc.edu.co (y docente2..docente9), estudiante@ucc.edu.co");
   console.log("   Contraseña: la definida en SEED_DEMO_PASSWORD (.env)");
 }
 
