@@ -33,6 +33,7 @@ export function manejar(roles: Rol[] | null, handler: (ctx: Contexto) => Promise
     try {
       const session = await getServerSession(authOptions);
       if (!session) throw new ErrorApi(401, "No autenticado. Inicia sesión para continuar.");
+      if (session.revocada) throw new ErrorApi(401, "Tu cuenta fue desactivada. Comunícate con el administrador del observatorio.");
       if (roles && !roles.includes(session.user.rol)) throw new ErrorApi(403, "No tienes permisos para esta operación.");
       const resultado = await handler({ req, session, params: ruta?.params ?? {} });
       // Un handler puede devolver una respuesta ya armada (p. ej. un archivo PDF o Excel)
