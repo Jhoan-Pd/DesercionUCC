@@ -67,7 +67,7 @@ export function GraficaMatriculaAnio({ datos }: { datos: FilaMonto[] }) {
           <BarChart data={datos} margin={{ top: 8, right: 12, bottom: 4, left: 8 }}>
             <CartesianGrid vertical={false} />
             <XAxis dataKey="clave" tick={{ fontSize: 12 }} />
-            <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => formatoCOPCompacto(v)} width={72} />
+            <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => formatoCOPCompacto(v)} width={96} />
             <Tooltip
               cursor={{ fill: "rgba(0,84,159,0.06)" }}
               content={({ active, payload }: TP) => {
@@ -143,7 +143,7 @@ export function GraficaRegional({ datos, horizonte }: { datos: FilaRegional[]; h
     <TarjetaGrafica
       titulo="Dimensión regional: ingresos que dejan de generar los municipios"
       descripcion={`Valor presente a ${horizonte} años de la diferencia de ingresos entre graduarse y quedarse como bachiller, sumado por municipio de origen.`}
-      nota="Calculado con la misma CalculadoraImpacto de cada estudiante y los salarios de referencia del OLE (editables en Parámetros)."
+      nota="Calculado por estudiante con la misma CalculadoraImpacto de la calculadora individual y los salarios de referencia del OLE (editables en Parámetros)."
       vacio={top.length === 0}
       className="lg:col-span-2"
       tabla={{ columnas: ["Municipio", "Departamento", "Desertores", "Ingresos de por vida no generados (VP)"], filas: datos.map((d) => [d.municipio, d.departamento, d.desertores, formatoCOP(d.perdidaIngresoVida)]) }}
@@ -153,7 +153,7 @@ export function GraficaRegional({ datos, horizonte }: { datos: FilaRegional[]; h
           <BarChart data={top} margin={{ top: 8, right: 12, bottom: 4, left: 8 }}>
             <CartesianGrid vertical={false} />
             <XAxis dataKey="municipio" tick={{ fontSize: 12 }} interval={0} angle={-25} textAnchor="end" height={56} />
-            <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => formatoCOPCompacto(v)} width={80} />
+            <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => formatoCOPCompacto(v)} width={104} />
             <Tooltip
               cursor={{ fill: "rgba(0,84,159,0.06)" }}
               content={({ active, payload }: TP) => {
