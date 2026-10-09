@@ -90,4 +90,24 @@ describe("generarDataset", () => {
     expect(activos).toHaveLength(1);
     expect(activos[0].codigo).toBe("2026-2");
   });
+
+  it("las intervenciones históricas son coherentes: desde 2021, en periodos cerrados y con matrícula ese periodo", () => {
+    expect(d.intervenciones.length).toBeGreaterThan(200);
+    const periodo = new Map(d.periodos.map((p) => [p.id, p]));
+    const matriculado = new Set(d.matriculas.map((m) => `${m.estudianteId}|${m.periodoId}`));
+    for (const i of d.intervenciones) {
+      const p = periodo.get(i.periodoId)!;
+      expect(p.anio).toBeGreaterThanOrEqual(2021);
+      expect(p.activo).toBe(false);
+      expect(matriculado.has(`${i.estudianteId}|${i.periodoId}`)).toBe(true);
+      expect(i.fecha.getTime()).toBeGreaterThanOrEqual(p.fechaInicio.getTime());
+      expect(i.fecha.getTime()).toBeLessThanOrEqual(p.fechaFin.getTime());
+      expect(i.montoApoyo === null).toBe(i.tipo !== "APOYO_ECONOMICO");
+    }
+  });
+
+  it("hay intervenciones de los cuatro tipos para poder compararlos", () => {
+    const tipos = new Set(d.intervenciones.map((i) => i.tipo));
+    expect([...tipos].sort()).toEqual(["ACOMPANAMIENTO_PSICOLOGICO", "APOYO_ECONOMICO", "ORIENTACION_VOCACIONAL", "TUTORIA"]);
+  });
 });
