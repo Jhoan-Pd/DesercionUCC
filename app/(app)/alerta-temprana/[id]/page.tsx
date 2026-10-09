@@ -78,12 +78,12 @@ export default async function FichaRiesgoPage({ params }: { params: { id: string
         </Alert>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {p && <GraficaFactores factores={p.factores} />}
         <GraficaHistorial notas={d.notas} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <GestorAlertas estudianteId={e.id} alertas={d.alertas} />
 
         <div className="space-y-6">

@@ -93,8 +93,8 @@ export function PanelDocente({ cursos, docentes, docenteSeleccionado, umbrales }
       {cursos.length === 0 ? (
         <Alert variant="info">No hay cursos asignados en el periodo actual.</Alert>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-          <nav aria-label="Cursos" className="space-y-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <nav aria-label="Cursos" className="min-w-0 space-y-2">
             <Label htmlFor="curso-movil" className="lg:hidden">Curso</Label>
             <Select id="curso-movil" className="lg:hidden" value={curso?.id} onChange={(e) => setCursoId(e.target.value)}>
               {cursos.map((c) => <option key={c.id} value={c.id}>{c.codigo} · {c.nombre}</option>)}

@@ -47,7 +47,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Re
         <>
           <TarjetasKpi kpis={resumen.kpis} />
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <GraficaCohorte datos={resumen.porCohorte} />
             <GraficaPrograma datos={resumen.porPrograma} />
             <GraficaSemestre datos={resumen.porSemestre} />
