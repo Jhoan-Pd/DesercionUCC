@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { esRol } from "@/lib/roles";
+import { ERROR_CUENTA_BLOQUEADA, ESTADO_LIMPIO, consultarBloqueo, registrarFallo } from "@/lib/seguridad/bloqueo";
+import { ServicioAuditoria } from "@/services/auditoria/ServicioAuditoria";
 
 const credencialesSchema = z.object({
   email: z.string().email(),
@@ -34,12 +36,24 @@ export const authOptions: NextAuthOptions = {
           where: { email: parsed.data.email.toLowerCase().trim() },
           include: { rol: true },
         });
+        // Mismo resultado para correo inexistente o cuenta inactiva: no se revela qué cuentas existen
         if (!usuario || !usuario.activo) return null;
 
-        const coincide = await bcrypt.compare(parsed.data.password, usuario.passwordHash);
-        if (!coincide || !esRol(usuario.rol.nombre)) return null;
+        // Cuenta bloqueada por intentos fallidos: ni siquiera se verifica la contraseña
+        if (consultarBloqueo(usuario).bloqueado) throw new Error(ERROR_CUENTA_BLOQUEADA);
 
-        await prisma.usuario.update({ where: { id: usuario.id }, data: { ultimoAcceso: new Date() } });
+        const coincide = await bcrypt.compare(parsed.data.password, usuario.passwordHash);
+        if (!coincide || !esRol(usuario.rol.nombre)) {
+          const nuevo = registrarFallo(usuario);
+          await prisma.usuario.update({ where: { id: usuario.id }, data: nuevo });
+          if (nuevo.bloqueadoHasta) {
+            await new ServicioAuditoria().registrar({ usuarioId: usuario.id, rol: usuario.rol.nombre, accion: "LOGIN_BLOQUEADO", recurso: "cuenta", detalle: `${nuevo.intentosFallidos} intentos fallidos seguidos` });
+            throw new Error(ERROR_CUENTA_BLOQUEADA);
+          }
+          return null;
+        }
+
+        await prisma.usuario.update({ where: { id: usuario.id }, data: { ...ESTADO_LIMPIO, ultimoAcceso: new Date() } });
 
         return {
           id: usuario.id,
