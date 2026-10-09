@@ -21,6 +21,13 @@ erDiagram
     USUARIOS ||--o{ INTERVENCIONES : "responsable"
     PROGRAMAS |o--o{ PARAMETROS_ECONOMICOS : "salario propio"
     USUARIOS |o--o{ PARAMETROS_ECONOMICOS : "última edición"
+    PROGRAMAS ||--o{ CURSOS : "ofrece"
+    PERIODOS ||--o{ CURSOS : "se dicta en"
+    USUARIOS ||--o{ CURSOS : "docente de"
+    CURSOS ||--o{ INSCRIPCIONES : "tiene"
+    ESTUDIANTES ||--o{ INSCRIPCIONES : "cursa"
+    CURSOS |o--o{ ALERTAS : "reportada desde"
+    USUARIOS |o--o{ MODELOS_RIESGO : "entrenó"
 
     ROLES {
         int id PK
@@ -123,9 +130,11 @@ erDiagram
         uuid id PK
         uuid estudianteId FK
         datetime fecha
-        boolean consentimiento
-        int puntaje
+        boolean consentimiento "Ley 1581"
+        boolean autorizaContacto
+        int puntaje "0-100"
         enum nivel
+        json puntajesDimension
     }
     RESPUESTAS_ENCUESTA {
         uuid id PK
@@ -147,7 +156,8 @@ erDiagram
         uuid id PK
         uuid estudianteId FK
         uuid creadaPorId FK
-        enum origen
+        uuid cursoId FK "si la reporta un docente"
+        enum origen "DOCENTE, MODELO, ENCUESTA, BIENESTAR"
         string motivo
         enum estado
     }
@@ -171,4 +181,31 @@ erDiagram
         string fuente
         uuid programaId FK "NULL = global"
         uuid actualizadoPorId FK
+    }
+    CURSOS {
+        uuid id PK
+        string codigo "UK con periodoId"
+        string nombre
+        int semestre
+        int creditos
+        uuid programaId FK
+        uuid periodoId FK
+        uuid docenteId FK
+    }
+    INSCRIPCIONES {
+        uuid id PK
+        uuid cursoId FK
+        uuid estudianteId FK
+        float notaParcial
+        float asistenciaPct
+        int fallas
+    }
+    MODELOS_RIESGO {
+        uuid id PK
+        string version UK
+        string origen "PYTHON_SKLEARN o ENTRENAMIENTO_ADMIN"
+        json definicion "coeficientes, medias, umbrales"
+        json metricas "AUC, Brier, calibración"
+        boolean activo
+        uuid entrenadoPorId FK
     }
