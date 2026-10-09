@@ -65,16 +65,22 @@ describe("formato de reportes", () => {
   });
 });
 
+/** Abre el .xlsx generado (ExcelJS tipa `load` con un Buffer antiguo de Node; se convierte a ArrayBuffer) */
+async function leerLibro(datosReporte: DatosReporte): Promise<ExcelJS.Workbook> {
+  const buffer = await new GeneradorReportes(datosReporte).aExcel();
+  const libro = new ExcelJS.Workbook();
+  await libro.xlsx.load(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer);
+  return libro;
+}
+
 describe("GeneradorReportes → Excel", () => {
   it("crea una hoja de resumen y una por tabla con datos (omite las vacías)", async () => {
-    const libro = new ExcelJS.Workbook();
-    await libro.xlsx.load(await new GeneradorReportes(datos()).aExcel());
+    const libro = await leerLibro(datos());
     expect(libro.worksheets.map((h) => h.name)).toEqual(["Resumen", "Programas", "Lista larga"]);
   });
 
   it("guarda los porcentajes como fracción con formato de porcentaje y respeta los vacíos", async () => {
-    const libro = new ExcelJS.Workbook();
-    await libro.xlsx.load(await new GeneradorReportes(datos()).aExcel());
+    const libro = await leerLibro(datos());
     const hoja = libro.getWorksheet("Programas")!;
     const encabezado = hoja.getRow(3);
     expect(encabezado.getCell(1).value).toBe("Programa");
@@ -85,8 +91,7 @@ describe("GeneradorReportes → Excel", () => {
   });
 
   it("la hoja de resumen incluye indicadores, filtros y el aviso de privacidad", async () => {
-    const libro = new ExcelJS.Workbook();
-    await libro.xlsx.load(await new GeneradorReportes(datos()).aExcel());
+    const libro = await leerLibro(datos());
     const textos: string[] = [];
     libro.getWorksheet("Resumen")!.eachRow((fila) => fila.eachCell((c) => textos.push(String(c.value))));
     const todo = textos.join(" | ");
