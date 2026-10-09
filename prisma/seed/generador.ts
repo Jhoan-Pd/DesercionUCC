@@ -17,6 +17,7 @@ import type {
   EstadoEstudiante,
   Sexo,
   TipoFinanciacion,
+  TipoIntervencion,
 } from "@prisma/client";
 import { Aleatorio, acotar, sigmoide } from "./aleatorio";
 import {
@@ -136,6 +137,18 @@ export interface ParametroSeed {
   programaId: string | null;
 }
 
+/** Intervención histórica de Bienestar (el responsable se asigna en el seed) */
+export interface IntervencionSeed {
+  id: string;
+  estudianteId: string;
+  periodoId: string;
+  tipo: TipoIntervencion;
+  fecha: Date;
+  descripcion: string;
+  montoApoyo: number | null;
+  resultado: string;
+}
+
 export interface DatasetSintetico {
   programas: ProgramaSeed[];
   periodos: PeriodoSeed[];
@@ -146,6 +159,7 @@ export interface DatasetSintetico {
   financiaciones: FinanciacionSeed[];
   retiros: RetiroSeed[];
   parametros: ParametroSeed[];
+  intervenciones: IntervencionSeed[];
 }
 
 export interface OpcionesGenerador {
@@ -260,6 +274,66 @@ function elegirCausa(r: Aleatorio, p: PerfilEstudiante, s: ResultadoSemestre, ca
 }
 
 // ---------------------------------------------------------------------
+// Intervenciones históricas de Bienestar (programa de acompañamiento desde 2021)
+// ---------------------------------------------------------------------
+
+/** Año en que arranca el programa de acompañamiento simulado */
+export const ANIO_INICIO_INTERVENCIONES = 2021;
+/** Solo se interviene a quien supera este riesgo semestral (el "en riesgo" que Bienestar detecta) */
+const UMBRAL_RIESGO_INTERVENCION = 0.12;
+
+/** Cobertura del programa: crece cada año a medida que Bienestar se fortalece */
+function coberturaIntervencion(anio: number): number {
+  return Math.min(0.6, 0.25 + 0.07 * (anio - ANIO_INICIO_INTERVENCIONES));
+}
+
+/**
+ * Efecto VERDADERO de cada tipo de intervención en el simulador: cuánto reduce el logit del
+ * riesgo de desertar ese semestre. El módulo de efectividad debe "redescubrir" estos efectos
+ * a partir de los datos (con la limitación de que solo ve lo observable, como en la realidad).
+ */
+export const EFECTO_INTERVENCION: Record<TipoIntervencion, number> = {
+  APOYO_ECONOMICO: 0.6,
+  TUTORIA: 0.45,
+  ACOMPANAMIENTO_PSICOLOGICO: 0.4,
+  ORIENTACION_VOCACIONAL: 0.25,
+  OTRO: 0.1,
+};
+
+/**
+ * Bienestar elige el tipo según lo que más pesa en la situación del estudiante, con algo de
+ * azar (no siempre hay cupo en tutorías, a veces el estudiante prefiere otra ayuda).
+ */
+function elegirTipoIntervencion(ri: Aleatorio, p: PerfilEstudiante, s: ResultadoSemestre, k: number): TipoIntervencion {
+  const cargaTrabajo = p.trabaja ? Math.min(p.horas, 48) / 40 : 0;
+  const vulnerable = p.estrato <= 2 && p.financiacion !== "BECA";
+  const tipos: TipoIntervencion[] = ["TUTORIA", "APOYO_ECONOMICO", "ACOMPANAMIENTO_PSICOLOGICO", "ORIENTACION_VOCACIONAL"];
+  const pesos = [
+    1 + (s.promedio < 3.0 ? 2 : 0) + (s.materiasPerdidas >= 2 ? 1 : 0),
+    0.8 + (vulnerable ? 1.5 : 0) + 2 * cargaTrabajo,
+    0.8 + (p.motivacion < -0.3 ? 1.5 : 0),
+    0.6 + (k <= 2 ? 0.8 : 0),
+  ];
+  return ri.ponderado(tipos, pesos);
+}
+
+const DESCRIPCIONES_INTERVENCION: Record<TipoIntervencion, string[]> = {
+  TUTORIA: ["Tutorías semanales en las asignaturas con nota baja.", "Plan de mejoramiento académico con monitor par.", "Tutoría de matemáticas y técnicas de estudio."],
+  APOYO_ECONOMICO: ["Descuento parcial en la matrícula del siguiente semestre.", "Auxilio de transporte y alimentación de Bienestar.", "Acompañamiento para renovar el crédito educativo y auxilio parcial."],
+  ACOMPANAMIENTO_PSICOLOGICO: ["Sesiones de acompañamiento psicológico individual.", "Taller de manejo de estrés y ansiedad ante exámenes.", "Seguimiento psicosocial con la familia."],
+  ORIENTACION_VOCACIONAL: ["Orientación vocacional y revisión del plan de carrera.", "Entrevista con el director de programa sobre expectativas.", "Taller de proyecto de vida."],
+  OTRO: ["Seguimiento general de Bienestar."],
+};
+
+const RESULTADOS_INTERVENCION: Record<TipoIntervencion, string[]> = {
+  TUTORIA: ["Asistió a la mayoría de tutorías.", "Mejoró en las evaluaciones finales.", "Asistencia irregular a las tutorías."],
+  APOYO_ECONOMICO: ["Apoyo entregado durante el semestre.", "Apoyo aprobado y desembolsado.", "Se gestionó la renovación del crédito."],
+  ACOMPANAMIENTO_PSICOLOGICO: ["Completó el ciclo de sesiones.", "Asistió a 4 de 6 sesiones.", "Remitido a la EPS para continuar el proceso."],
+  ORIENTACION_VOCACIONAL: ["Confirmó su elección de carrera.", "Ajustó su carga académica.", "Evalúa un cambio de programa."],
+  OTRO: ["Seguimiento cerrado."],
+};
+
+// ---------------------------------------------------------------------
 // Utilidades
 // ---------------------------------------------------------------------
 
@@ -281,6 +355,8 @@ export function generarDataset(opciones: OpcionesGenerador = {}): DatasetSinteti
   const total = opciones.totalEstudiantes ?? 1500;
   const semilla = opciones.semilla ?? 2026;
   const r = new Aleatorio(semilla);
+  // Flujo aleatorio aparte para las intervenciones: así el resto del dataset cambia lo mínimo
+  const ri = new Aleatorio(semilla + 101);
   fakerES.seed(semilla);
 
   // Programas -----------------------------------------------------------------
@@ -346,6 +422,7 @@ export function generarDataset(opciones: OpcionesGenerador = {}): DatasetSinteti
   const notas: NotaSeed[] = [];
   const financiaciones: FinanciacionSeed[] = [];
   const retiros: RetiroSeed[] = [];
+  const intervenciones: IntervencionSeed[] = [];
 
   const periodoPorIndice = new Map(periodos.map((p) => [p.indice, p]));
   let consecutivo = 1;
@@ -433,8 +510,27 @@ export function generarDataset(opciones: OpcionesGenerador = {}): DatasetSinteti
           estado = "GRADUADO";
           break;
         }
+        // ¿Lo interviene Bienestar este semestre? (solo desde 2021 y si está en riesgo)
+        let riesgo = probabilidadDesercion(perfil, k, sem);
+        if (periodo.anio >= ANIO_INICIO_INTERVENCIONES && riesgo >= UMBRAL_RIESGO_INTERVENCION && ri.bernoulli(coberturaIntervencion(periodo.anio))) {
+          const tipo = elegirTipoIntervencion(ri, perfil, sem, k);
+          const logit = Math.log(riesgo / (1 - riesgo)) - EFECTO_INTERVENCION[tipo];
+          riesgo = sigmoide(logit);
+          const ini = periodo.fechaInicio.getTime();
+          const fin = periodo.fechaFin.getTime();
+          intervenciones.push({
+            id: randomUUID(),
+            estudianteId: idEstudiante,
+            periodoId: periodo.id,
+            tipo,
+            fecha: new Date(ini + (fin - ini) * ri.rango(0.25, 0.7)),
+            descripcion: ri.elegir(DESCRIPCIONES_INTERVENCION[tipo]),
+            montoApoyo: tipo === "APOYO_ECONOMICO" ? Math.round((valor * ri.rango(0.3, 0.6)) / 50_000) * 50_000 : null,
+            resultado: ri.elegir(RESULTADOS_INTERVENCION[tipo]),
+          });
+        }
         // ¿Deserta al terminar/durante este semestre?
-        if (r.bernoulli(probabilidadDesercion(perfil, k, sem))) {
+        if (r.bernoulli(riesgo)) {
           estado = "DESERTOR";
           const causa = elegirCausa(r, perfil, sem, causas, CAUSAS);
           const fin = periodo.fechaFin.getTime();
@@ -539,5 +635,5 @@ export function generarDataset(opciones: OpcionesGenerador = {}): DatasetSinteti
     });
   });
 
-  return { programas, periodos, causas, estudiantes, matriculas, notas, financiaciones, retiros, parametros };
+  return { programas, periodos, causas, estudiantes, matriculas, notas, financiaciones, retiros, parametros, intervenciones };
 }
