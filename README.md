@@ -4,7 +4,7 @@ Sistema web que **mide el impacto de desertar** de la educación superior y ayud
 
 Proyecto final de la asignatura *Programación Orientada a la Web*.
 
-> **Estado actual: Fase 2 completa.** Además de la Fase 1 (BD, datos sintéticos, autenticación por roles, dashboard institucional y calculadora de impacto), ya funcionan el **modelo de riesgo** (regresión logística entrenada en Python), la **alerta temprana**, la **encuesta de autoevaluación** y el **panel docente**. Los módulos de la Fase 3 aparecen en el menú como "Fase 3".
+> **Estado actual: las tres fases están completas (versión 0.3.0).** Medición del impacto en cuatro dimensiones (económica, académica, institucional y social/regional), dashboard institucional, calculadora "¿qué pasa si me retiro?", modelo de riesgo con alerta temprana, encuesta de autoevaluación, panel docente, intervenciones con medición de su efectividad, reportes PDF/Excel, importación CSV y panel de administración completo (usuarios, catálogos, parámetros, reentrenamiento del modelo y auditoría).
 
 ![Dashboard institucional](docs/capturas/dashboard.png)
 
@@ -35,7 +35,7 @@ Las decisiones de retiro suelen tomarse sin dimensionar estos costos y las alert
 |---|---|---|
 | **1** | Proyecto, BD con Prisma y seed sintético, auth con roles, dashboard institucional, calculadora de impacto, despliegue en Vercel | ✅ Lista |
 | **2** | Modelo de riesgo (regresión logística), alerta temprana, encuesta del estudiante, panel docente | ✅ Lista |
-| 3 | Intervenciones y su efectividad, impacto institucional, reportes PDF/Excel, importación CSV, README final | Pendiente |
+| **3** | Intervenciones y su efectividad, impacto institucional, reportes PDF/Excel, importación CSV, administración completa (usuarios, programas, periodos, reentrenamiento del modelo, auditoría), seguridad de cuentas y README final | ✅ Lista |
 
 ---
 
@@ -46,9 +46,9 @@ flowchart LR
     U[Navegador] -->|HTTPS| MW[Middleware Edge<br/>protección por rol]
     MW --> P[Páginas App Router<br/>Server Components]
     MW --> API[API Routes<br/>Zod en cada endpoint]
-    P --> S[Servicios POO<br/>ServicioDashboard · ServicioImpacto · ServicioParametros]
+    P --> S[Servicios POO<br/>Dashboard · Impacto · Riesgo · Intervenciones<br/>Reportes · Importación · Administración · Auditoría]
     API --> S
-    S --> C[Lógica pura<br/>CalculadoraImpacto · calculos.ts]
+    S --> C[Lógica pura sin BD<br/>CalculadoraImpacto · ModeloRiesgo · Reentrenador<br/>AnalizadorIntervenciones · CalculadoraInstitucional<br/>GeneradorReportes · ImportadorCSV]
     S --> DB[(PostgreSQL<br/>Supabase / Neon)]
     P -. "Client Components" .-> R[Recharts · React Hook Form]
     subgraph Vercel
@@ -74,9 +74,13 @@ observatorio-desercion-ucc/
 │   │   ├── alerta-temprana/   # Lista priorizada y ficha del estudiante (Bienestar)
 │   │   ├── encuesta/          # Autoevaluación del estudiante
 │   │   ├── panel-docente/     # Señales académicas de los cursos del docente
-│   │   ├── admin/parametros/  # Parámetros editables (ADMIN)
-│   │   └── [modulo]/          # Módulos de la Fase 3 ("próximamente")
-│   ├── api/                   # API REST (auth, dashboard, impacto, parametros, riesgo, alertas, encuesta, docente)
+│   │   ├── intervenciones/    # Registro, seguimiento y efectividad (Bienestar)
+│   │   ├── impacto-institucional/ # Impacto institucional, académico y regional con proyección
+│   │   ├── reportes/          # Descarga de reportes PDF y Excel anonimizados
+│   │   ├── admin/             # Panel: parámetros, programas, periodos, usuarios, modelo, importar y auditoría
+│   │   └── [modulo]/          # Página "próximamente" (solo para módulos de fases futuras)
+│   ├── api/                   # API REST: auth, dashboard, impacto, riesgo, alertas, encuesta, docente,
+│   │                          #   intervenciones, impacto-institucional, reportes y admin/*
 │   └── acceso-denegado/
 ├── components/
 │   ├── ui/                    # Componentes estilo shadcn/ui (button, card, input...)
@@ -86,22 +90,30 @@ observatorio-desercion-ucc/
 │   ├── riesgo/                # Insignia de nivel, gráfica de factores, gestor de alertas
 │   ├── encuesta/              # Formulario Likert y resultado
 │   ├── docente/               # Panel docente
-│   └── admin/                 # Editor de parámetros
-├── lib/                       # prisma, auth, rbac, roles, utilidades, validadores Zod
+│   ├── intervenciones/        # Registro, cierre, gráfico de bosque y efectividad
+│   ├── institucional/         # Proyección interactiva y gráficas de impacto
+│   ├── reportes/              # Panel de reportes y botón de descarga
+│   └── admin/                 # Parámetros, programas, periodos, usuarios, modelo, importación y auditoría
+├── lib/                       # prisma, auth, rbac, roles, seguridad (bloqueo y sesión), validadores Zod
 ├── services/                  # Lógica de negocio (POO)
 │   ├── impacto/               # CalculadoraImpacto (pura) + ServicioImpacto
 │   ├── dashboard/             # calculos.ts (puro) + ServicioDashboard
-│   ├── riesgo/                # ModeloRiesgo, EntrenadorLogistico, características, ServicioRiesgo
+│   ├── riesgo/                # ModeloRiesgo, EntrenadorLogistico, Reentrenador, ServicioRiesgo, ServicioModelo
 │   ├── encuesta/              # Preguntas, EvaluadorEncuesta, ServicioEncuesta
 │   ├── alertas/ · docente/    # ServicioAlertas, ServicioDocente
+│   ├── intervenciones/        # AnalizadorIntervenciones (puro) + ServicioIntervenciones
+│   ├── institucional/         # CalculadoraInstitucional (pura) + ServicioImpactoInstitucional
+│   ├── reportes/              # Contenido, GeneradorReportes (PDF/Excel) y ServicioReportes
+│   ├── importacion/           # Lector CSV, ImportadorCSV (puro) y ServicioImportacion
+│   ├── admin/ · auditoria/    # ServicioCatalogos, ServicioUsuarios, reglas puras y ServicioAuditoria
 │   └── parametros/            # ServicioParametros + conversores
 ├── prisma/
-│   ├── schema.prisma          # 19 tablas
-│   ├── migrations/            # Migraciones SQL (inicial + Fase 2)
+│   ├── schema.prisma          # 21 tablas
+│   ├── migrations/            # Migraciones SQL: inicial, Fase 2 y Fase 3
 │   ├── seed.ts                # Inserta los datos
 │   └── seed/                  # Generador sintético (puro y determinista)
 ├── ml/                        # Exportación del panel, entrenamiento scikit-learn, notebook, reporte y modelo JSON
-├── tests/                     # Vitest (99 pruebas)
+├── tests/                     # Vitest (189 pruebas en 18 archivos)
 ├── docs/                      # Diagrama ER y capturas
 └── middleware.ts              # Protección de rutas por rol
 ```
@@ -115,20 +127,29 @@ observatorio-desercion-ucc/
 | `ServicioDashboard` | Consulta la BD con filtros combinables y arma el resumen | `construirWhere` (estático), `obtenerResumen` |
 | `ServicioParametros` | Lectura y edición de parámetros OLE/SPADIES | `listar`, `actualizar`, `mapa`, `paraCalculadora`, `referenciasSpadies` |
 | `ModeloRiesgo` | Aplica la regresión logística exportada desde Python: probabilidad, puntaje 0-100, nivel y aporte exacto de cada factor | `predecir`, `predecirVector`, `clasificar`, `principalesRiesgos` |
-| `EntrenadorLogistico` | Reentrena la regresión logística en TypeScript (Newton-Raphson con L2), con los mismos coeficientes que scikit-learn | `ajustar` |
+| `EntrenadorLogistico` | Ajusta la regresión logística en TypeScript (Newton-Raphson con L2), con los mismos coeficientes que scikit-learn | `ajustar`, `umbrales`, `definicion` |
+| `Reentrenador` | Reentrena con los datos de la BD siguiendo el procedimiento del script de Python (prueba por estudiante, modelo final) y recomienda si activar | `entrenar`, `recomendar`, `nombreVersion` |
+| `ServicioModelo` | Versiones del modelo: listar, reentrenar (auditado) y activar o volver a una anterior con recálculo de puntajes | `listar`, `entrenar`, `activar` |
 | `ServicioRiesgo` | Recalcula puntajes, genera alertas del modelo, lista priorizada y ficha del estudiante | `recalcular`, `listaPriorizada`, `detalle` |
 | `EvaluadorEncuesta` | Puntaje por dimensión y global de la encuesta, regla de intención de retiro y recursos sugeridos | `validar`, `evaluar` (estáticos) |
 | `ServicioEncuesta` · `ServicioAlertas` · `ServicioDocente` | Encuesta con consentimiento, alertas con control de acceso por curso, señales académicas del docente | `responder`, `crear`, `cambiarEstado`… |
+| `AnalizadorIntervenciones` | Efecto de las intervenciones ajustado por riesgo (ATT estratificado por franjas del modelo, IC 95 %) | `analizar` |
+| `ServicioIntervenciones` | Registro, cierre auditado y efectividad sobre el modelo activo | `listar`, `crear`, `actualizar` (cierre), `efectividad` |
+| `CalculadoraInstitucional` | Matrícula no percibida, graduación por cohorte, pérdida regional y proyección "si la deserción baja X %" | `calcular`, `proyectar` |
+| `GeneradorReportes` | Convierte un mismo contenido anonimizado en PDF (jsPDF) o Excel (ExcelJS) | `aPdf`, `aExcel` |
+| `ImportadorCSV` | Valida un CSV de Registro Académico celda por celda y entre filas antes de tocar la BD (todo o nada) | `analizar` |
+| `ServicioUsuarios` · `ServicioCatalogos` | Cuentas, roles, activación, contraseñas y desbloqueo; CRUD de programas y periodos con reglas de integridad | `crear`, `actualizar`, `listar`; `crearPrograma`, `actualizarPeriodo`, `eliminarPrograma`… |
+| `ServicioAuditoria` | Registro persistente de accesos a datos personales y cambios administrativos (Ley 1581) | `registrar`, `listar` |
 | `Aleatorio` | Generador pseudoaleatorio con semilla para el seed | `normal`, `bernoulli`, `ponderado` |
 | `ErrorApi` | Errores controlados con código HTTP | — |
 
-> `GeneradorReportes` (Fase 3) seguirá el mismo patrón.
+> Patrón común: la lógica de negocio vive en clases **puras** (sin Prisma ni React) que se prueban con Vitest, y los `Servicio…` solo cargan datos, aplican permisos y auditan.
 
 ---
 
 ## 5. Modelo de datos (diagrama entidad-relación)
 
-19 tablas: las 16 pedidas (`roles`, `usuarios`, `programas`, `periodos`, `estudiantes`, `matriculas`, `notas_semestre`, `financiacion`, `retiros`, `causas_desercion`, `encuestas`, `respuestas_encuesta`, `puntajes_riesgo`, `alertas`, `intervenciones`, `parametros_economicos`) más 3 de la Fase 2: `cursos` e `inscripciones` (panel docente) y `modelos_riesgo` (versiones del modelo). Versión completa con todos los atributos: [`docs/diagrama-er.png`](docs/diagrama-er.png) (fuente: [`docs/diagrama-er.mmd`](docs/diagrama-er.mmd)).
+21 tablas: las 16 pedidas (`roles`, `usuarios`, `programas`, `periodos`, `estudiantes`, `matriculas`, `notas_semestre`, `financiacion`, `retiros`, `causas_desercion`, `encuestas`, `respuestas_encuesta`, `puntajes_riesgo`, `alertas`, `intervenciones`, `parametros_economicos`), 3 de la Fase 2 (`cursos` e `inscripciones` para el panel docente y `modelos_riesgo` para las versiones del modelo) y 2 de la Fase 3 (`importaciones` y `auditoria_accesos`). En la Fase 3 también se añadieron a `usuarios` los campos de bloqueo por intentos fallidos y a `intervenciones` el periodo, la alerta que la originó y el resultado. Versión completa con todos los atributos: [`docs/diagrama-er.png`](docs/diagrama-er.png) (fuente: [`docs/diagrama-er.mmd`](docs/diagrama-er.mmd)).
 
 ```mermaid
 erDiagram
@@ -160,6 +181,10 @@ erDiagram
     ESTUDIANTES ||--o{ INSCRIPCIONES : "cursa"
     CURSOS |o--o{ ALERTAS : "reportada desde"
     USUARIOS |o--o{ MODELOS_RIESGO : "entrenó"
+    PERIODOS |o--o{ INTERVENCIONES : "realizada en"
+    ALERTAS |o--o{ INTERVENCIONES : "origina"
+    USUARIOS ||--o{ IMPORTACIONES : "carga"
+    USUARIOS ||--o{ AUDITORIA_ACCESOS : "deja rastro en"
 
     ROLES { int id PK
         string nombre UK }
@@ -167,7 +192,9 @@ erDiagram
         string email UK
         string passwordHash
         int rolId FK
-        uuid estudianteId FK }
+        uuid estudianteId FK
+        int intentosFallidos
+        datetime bloqueadoHasta }
     PROGRAMAS { uuid id PK
         string nombre UK
         int duracionSemestres
@@ -226,7 +253,10 @@ erDiagram
     INTERVENCIONES { uuid id PK
         uuid estudianteId FK
         uuid responsableId FK
-        enum tipo }
+        uuid periodoId FK
+        uuid alertaId FK
+        enum tipo
+        enum estado }
     PARAMETROS_ECONOMICOS { uuid id PK
         string clave
         float valor
@@ -244,6 +274,14 @@ erDiagram
         string version UK
         json definicion
         boolean activo }
+    IMPORTACIONES { uuid id PK
+        string archivo
+        int filas
+        uuid usuarioId FK }
+    AUDITORIA_ACCESOS { uuid id PK
+        uuid usuarioId FK
+        string accion
+        string recurso }
 ```
 
 ---
@@ -296,12 +334,12 @@ Comandos útiles:
 
 | Rol | Correo | Ve |
 |---|---|---|
-| ADMIN | `admin@ucc.edu.co` | Todo + parámetros |
-| BIENESTAR | `bienestar@ucc.edu.co` | Dashboard, alerta temprana (lista y ficha), calculadora con perfil por código |
-| DOCENTE | `docente@ucc.edu.co` | Panel docente con sus 8 cursos del periodo 2026-2 y la calculadora |
+| ADMIN | `admin@ucc.edu.co` | Todo, más el panel de administración (parámetros, programas, periodos, usuarios, modelo, importación y auditoría) |
+| BIENESTAR | `bienestar@ucc.edu.co` (también `bienestar2` y `bienestar3`) | Dashboard, alerta temprana (lista y ficha), intervenciones, impacto institucional, reportes y calculadora con perfil por código |
+| DOCENTE | `docente@ucc.edu.co` (también `docente2` a `docente9`) | Panel docente con sus cursos del periodo 2026-2 y la calculadora |
 | ESTUDIANTE | `estudiante@ucc.edu.co` | Su calculadora con sus datos precargados y la encuesta de autoevaluación |
 
-La contraseña de todas es la de la variable `SEED_DEMO_PASSWORD` del `.env` (valor de ejemplo en `.env.example`). **Cámbiala antes de compartir la URL pública** y vuelve a correr el seed.
+La contraseña de todas es la de la variable `SEED_DEMO_PASSWORD` del `.env` (valor de ejemplo en `.env.example`). **Cámbiala antes de compartir la URL pública** y vuelve a correr el seed. Tras 5 contraseñas incorrectas seguidas la cuenta se bloquea 15 minutos (el administrador puede desbloquearla en Admin → Usuarios).
 
 ---
 
@@ -355,15 +393,14 @@ Debe mostrar `✅ Seed completado` con 1.500 estudiantes.
 
 ### 8.3 Subir el código a GitHub
 
+El proyecto **ya es un repositorio Git** con todo el historial de desarrollo (ver sección 16). Crea un repositorio **vacío** en github.com (sin README ni .gitignore) y sube todas las ramas y etiquetas:
+
 ```bash
 cd observatorio-desercion-ucc
-git init
-git add .
-git commit -m "Fase 1: Observatorio de Deserción UCC"
-# crea un repositorio vacío en github.com y luego:
 git remote add origin https://github.com/TU_USUARIO/observatorio-desercion-ucc.git
-git branch -M main
 git push -u origin main
+git push origin --all      # ramas de cada funcionalidad (trazabilidad)
+git push origin --tags     # v0.1.0-fase1, v0.2.0-fase2, v0.3.0-fase3
 ```
 
 El `.gitignore` ya excluye `.env` y `node_modules`: **nunca subas tu `.env`**.
@@ -397,7 +434,7 @@ El `.gitignore` ya excluye `.env` y `node_modules`: **nunca subas tu `.env`**.
 
 Los datos reales son privados (Ley 1581 de 2012), así que `prisma/seed/generador.ts` simula **1.500 estudiantes** de 9 programas, cohortes **2018-1 a 2025-2**, con edad, sexo, estrato, municipio de origen (Nariño, Putumayo, Cauca, Valle), trabajo y horas, financiación (recursos propios, ICETEX, beca, crédito UCC), notas, materias perdidas y asistencia por semestre.
 
-La deserción **no se asigna al azar**: se simula semestre a semestre con un modelo logit que depende de estrato, carga laboral, promedio, materias perdidas, asistencia, financiación, programa y semestre (el riesgo es mayor en los primeros semestres). Está calibrado para que la deserción acumulada a 10 semestres ronde el **40 %** (SPADIES nacional: 36,7 %). Cada retiro tiene una causa clasificada en las **cuatro categorías del MEN (SPADIES)**: individuales, académicas, socioeconómicas e institucionales, elegida según el perfil del estudiante. El generador es **determinista** (semilla fija): siempre produce el mismo dataset.
+La deserción **no se asigna al azar**: se simula semestre a semestre con un modelo logit que depende de estrato, carga laboral, promedio, materias perdidas, asistencia, financiación, programa y semestre (el riesgo es mayor en los primeros semestres). Está calibrado para que la deserción acumulada a 10 semestres ronde el **40 %** (SPADIES nacional: 36,7 %); con las intervenciones de Bienestar de la Fase 3, la curva Kaplan-Meier del dataset da 38,2 % en total y entre 38,6 % y 42,8 % en las cohortes 2018-2021. Cada retiro tiene una causa clasificada en las **cuatro categorías del MEN (SPADIES)**: individuales, académicas, socioeconómicas e institucionales, elegida según el perfil del estudiante. El generador es **determinista** (semilla fija): siempre produce el mismo dataset.
 
 ### 9.2 Dashboard institucional
 
@@ -430,14 +467,17 @@ Todos los supuestos (SMMLV 2026, salarios de enganche del Observatorio Laboral p
 2. **Exportación** (`npm run ml:dataset`) → CSV, y **entrenamiento** en Python (`ml/entrenar_modelo.py`): `StandardScaler` + `LogisticRegression(C=1)` de scikit-learn, separación entrenamiento/prueba **por estudiante** (sin fuga de información), validación cruzada de 5 pliegues y comparación contra una regla simple. Se exportan coeficientes, medias y desviaciones a `ml/modelo_riesgo.json`. El análisis completo está en el notebook `ml/modelo_riesgo.ipynb` y en [`ml/reporte_modelo.md`](ml/reporte_modelo.md).
 3. **Predicción en TypeScript** (`ModeloRiesgo`): sin servidor Python en producción. `p = 1/(1+e^-(b₀ + Σ βᵢ·zᵢ))`, puntaje = `round(100·p)`.
 4. **Explicación exacta**: como las variables están estandarizadas, el aporte de cada factor es `βᵢ·zᵢ` (cuánto aleja al estudiante del promedio). La suma de aportes más el intercepto reconstruye la probabilidad; no es una aproximación.
-5. **Reentrenamiento sin Python**: `EntrenadorLogistico` resuelve el mismo problema con Newton-Raphson y una prueba automática verifica que reproduce los coeficientes de scikit-learn.
+5. **Reentrenamiento sin Python**: `EntrenadorLogistico` resuelve el mismo problema con Newton-Raphson y una prueba automática verifica que reproduce los coeficientes de scikit-learn. El administrador lo usa desde **Admin → Modelo de riesgo** (sección 9.12).
 
 | Métrica (conjunto de prueba) | Valor |
 |---|---|
-| AUC-ROC | **0,819** (validación cruzada 0,829 ± 0,026) |
-| AUC de la regla "promedio bajo" | 0,753 |
-| Brier | 0,091 |
-| Niveles | BAJO < 11 % · MEDIO 11-29 % · ALTO ≥ 29 % (tasa base 11,4 %) |
+| AUC-ROC | **0,851** (validación cruzada 0,815 ± 0,011) |
+| AUC de la regla "promedio bajo" | 0,770 |
+| Brier | 0,079 |
+| Precisión / sensibilidad del nivel ALTO | 51,7 % / 41,6 % |
+| Niveles | BAJO < 11 % · MEDIO 11-27 % · ALTO ≥ 27 % (tasa base 10,7 %) |
+
+Versión `sklearn-20261009`, reentrenada en la Fase 3 con los datos que ya incluyen las intervenciones de Bienestar. Detalle en [`ml/reporte_modelo.md`](ml/reporte_modelo.md).
 
 ### 9.5 Alerta temprana (Bienestar)
 
@@ -451,19 +491,58 @@ Lista priorizada de los estudiantes activos ordenada por puntaje, con nivel (íc
 
 El docente ve únicamente sus cursos del periodo actual con la nota parcial, asistencia y fallas de cada estudiante, y las **señales** (nota parcial < 3,0 o asistencia < 80 %). Puede reportar una alerta a Bienestar desde cada fila. Por **minimización de datos** no ve el puntaje del modelo ni información socioeconómica, y la API verifica que el estudiante esté inscrito en uno de sus cursos antes de aceptar el reporte.
 
+### 9.8 Intervenciones y su efectividad (Bienestar)
+
+Bienestar registra cada acción (tutoría académica, apoyo económico con monto obligatorio, acompañamiento psicológico, orientación vocacional u otra) desde la lista o desde la ficha del estudiante, y puede vincularla a una alerta abierta. Al cerrarla anota el resultado. La lista se filtra por estado, tipo y estudiante, y muestra la **situación actual** de cada intervenido (sigue estudiando, se graduó o desertó).
+
+**¿Funcionan?** Comparar intervenidos con no intervenidos "a secas" es injusto: Bienestar atiende justamente a quienes tienen más riesgo (sesgo de selección), y por eso la comparación ingenua sale negativa. `AnalizadorIntervenciones` estratifica las filas estudiante-semestre por la **probabilidad de deserción que estima el modelo**, compara dentro de cada franja y promedia las diferencias ponderando por los intervenidos: es el **efecto promedio en los tratados (ATT)**, con **intervalo de confianza del 95 %**. Se muestra junto a la comparación ingenua, por tipo de intervención en un gráfico de bosque, la permanencia por franja de riesgo y la cobertura del acompañamiento por periodo. La página advierte que es un análisis observacional: muestra asociación, no causalidad.
+
+### 9.9 Impacto institucional, académico y regional
+
+`CalculadoraInstitucional` cuantifica, con el filtro por programa:
+
+- **Institucional (UCC):** matrícula no percibida por los semestres que los desertores ya no cursaron, matrícula futura perdida por año de retiro y graduación por cohorte.
+- **Académica:** semestres cursados que no terminaron en un título.
+- **Social y regional:** ingresos de por vida (valor presente a 20 años) que cada municipio y departamento de origen deja de generar. Se calcula por estudiante con la misma `CalculadoraImpacto` de la calculadora individual.
+- **Proyección:** con un control deslizante, "¿y si la deserción bajara X %?". Muestra cuántos estudiantes seguirían estudiando, la matrícula recuperada, la nueva tasa anual, la graduación de las cohortes y el ingreso que ganaría la región. Se calcula en el navegador.
+
+### 9.10 Reportes PDF y Excel
+
+Cuatro reportes: **institucional** (lo mismo del dashboard), **lista de riesgo** (código anónimo, programa, semestre, puntaje, nivel y factores, sin nombres ni documentos), **efectividad de las intervenciones** e **impacto institucional y regional**. Cada uno se descarga en PDF (encabezado institucional, indicadores, barras y tablas paginadas) o en Excel (hoja de resumen y una hoja por tabla, con formato colombiano), con filtro opcional por programa. `GeneradorReportes` produce ambos formatos a partir del **mismo contenido**, que ya viene anonimizado. Cada exportación queda en la auditoría y el usuario ve su propio historial.
+
+### 9.11 Importación de datos reales (CSV)
+
+Admin → Importar recibe el reporte de Registro Académico: una fila por estudiante y semestre cursado, con **25 columnas** (21 obligatorias). Se puede descargar una plantilla de ejemplo. El lector detecta el separador (coma o punto y coma), las comillas, el BOM y los finales de línea de Windows, y acepta alias de encabezados y la coma decimal. `ImportadorCSV` valida cada celda, las reglas entre columnas (por ejemplo, la causa de retiro es obligatoria si el estado es DESERTOR) y que los datos de un mismo estudiante coincidan en todas sus filas. Primero se muestra una **vista previa** con los errores por fila y columna. Solo si no hay ninguno se puede confirmar, y la importación es **transaccional, todo o nada**: no quedan trayectorias a medias. Límites: 5 MB y 10.000 filas. Cada carga queda registrada en el historial de importaciones y en la auditoría.
+
+### 9.12 Administración
+
+- **Panel** con el periodo actual y los conteos principales, más acceso a cada sección.
+- **Parámetros:** salarios OLE, costos, tasas, escenarios y referencias SPADIES (Fase 1).
+- **Programas:** crear, editar (duración, matrícula y salario de enganche propio), activar o desactivar, y eliminar solo si no tiene estudiantes.
+- **Periodos:** el sistema propone el siguiente periodo y valida las fechas. Activar el periodo actual pide confirmación.
+- **Usuarios y roles:** crear cuentas, cambiar el rol, desactivar, restablecer la contraseña (mínimo 8 caracteres con letras y números) y desbloquear. Nadie puede desactivarse ni quitarse el rol ADMIN a sí mismo, y el sistema nunca se queda sin un administrador activo. Desactivar una cuenta o cambiarle el rol **corta su acceso de inmediato**, sin esperar a que venza la sesión de 8 horas.
+- **Modelo de riesgo (reentrenamiento):** con un clic, `Reentrenador` vuelve a entrenar la regresión logística con los datos actuales de la BD y el mismo procedimiento del script de Python. Separa el 20 % de los **estudiantes** para medir el AUC fuera de muestra y luego ajusta el modelo final con todos los datos. Compara la versión nueva con la activa sobre las **mismas filas de prueba**: las dos se entrenaron con todos los datos disponibles en su momento, así que la comparación es simétrica. Con eso recomienda activar, revisar o no activar, según una regla documentada:
+  - **No activar:** el entrenamiento no convergió o el AUC cae más de 0,02.
+  - **Revisar:** el AUC cae entre 0,005 y 0,02, el Brier empeora más de 5 % o hay pocos desertores en la prueba.
+  - **Activar:** en cualquier otro caso.
+
+  También muestra las variables con más peso para revisar que los signos tengan sentido. La versión nueva queda **inactiva** hasta que el administrador la active. Al activarla se recalculan los puntajes de la alerta temprana, y desde el historial se puede **volver a cualquier versión anterior**. Con los datos del seed, reentrenar tarda menos de un segundo y reproduce el modelo de scikit-learn.
+- **Auditoría de accesos:** consultas a datos individuales, exportaciones, importaciones, intervenciones, bloqueos y cambios administrativos, filtrable por acción. Los estudiantes aparecen siempre con su código anónimo.
+
 ---
 
 ## 10. Seguridad y Ley 1581 de 2012 (habeas data)
 
 - **Autenticación** con Auth.js (credenciales), contraseñas con **bcrypt**, sesión JWT firmada de 8 horas.
+- **Fuerza bruta:** tras 5 contraseñas incorrectas seguidas la cuenta se bloquea 15 minutos; el login lo informa y el bloqueo queda en la auditoría.
+- **Revocación inmediata:** en cada petición se revalida la sesión contra el estado actual de la cuenta (activa, existente, rol vigente). Desactivar o cambiar el rol corta el acceso al instante.
 - **Autorización por rol en dos capas**: `middleware.ts` (antes de renderizar) y cada endpoint (`manejar(roles, …)`). Fuente única de permisos: `lib/rbac.ts`.
-- **Datos individuales** solo para ADMIN y BIENESTAR (y cada estudiante los suyos). Un docente o estudiante que pida el código de otro estudiante recibe solo valores generales. Cada consulta individual de Bienestar/Admin se registra en el log (`[AUDITORIA]`, con el hash anónimo).
-- **Anonimización**: cada estudiante tiene un `hashAnonimo`; el dashboard solo muestra agregados.
+- **Datos individuales** solo para ADMIN y BIENESTAR (y cada estudiante los suyos). Un docente o estudiante que pida el código de otro estudiante recibe solo valores generales. Cada consulta individual, exportación, importación y cambio administrativo queda en la tabla persistente `auditoria_accesos` (principio de responsabilidad demostrada), visible en Admin → Auditoría y siempre con el código anónimo del estudiante.
+- **Anonimización**: cada estudiante tiene un `hashAnonimo`; el dashboard y el impacto institucional solo muestran agregados y los reportes exportables nunca incluyen nombres ni documentos.
 - **Consentimiento**: campos `consentimientoDatos` / `fechaConsentimiento` en estudiantes; la encuesta no se puede responder sin consentimiento y la alerta a Bienestar requiere autorización expresa de contacto.
 - **Minimización**: el docente solo ve datos académicos de sus cursos; el puntaje del modelo y los datos socioeconómicos son solo para Bienestar y Administración.
 - **Validación Zod** en cada endpoint con mensajes en español; errores controlados con códigos HTTP correctos (400, 401, 403, 404).
 - El login solo redirige a rutas internas (rechaza `//sitio` y `/\sitio`, evitando redirecciones abiertas).
-- Pendiente para la Fase 3: límite de intentos de inicio de sesión (rate limiting) y tabla de auditoría persistente.
 
 ---
 
@@ -483,6 +562,12 @@ El docente ve únicamente sus cursos del periodo actual con la nota parcial, asi
 | **Select nativo** | Accesible y ligero para filtros; los demás componentes siguen el estilo de shadcn/ui. |
 | **Kaplan-Meier** | Evita el sesgo de las cohortes que aún no terminan. |
 | **Generador con semilla** | Datos reproducibles: los tests y la sustentación muestran siempre los mismos números. |
+| **Efecto ajustado por riesgo (ATT estratificado)** | Bienestar interviene a los de mayor riesgo; comparar sin ajustar mostraría que intervenir "empeora", lo cual es un sesgo de selección. |
+| **Reentrenamiento en TypeScript** | Mismo resultado que scikit-learn sin mantener un servidor Python en producción; el script y el notebook de Python siguen siendo la referencia del análisis. |
+| **Versiones del modelo en la BD** | Activar o volver atrás es un cambio de datos, no un despliegue; cada versión guarda sus métricas y quién la entrenó. |
+| **Un contenido, dos formatos** | El reporte se arma una vez (anonimizado) y `GeneradorReportes` lo convierte a PDF o Excel: no hay riesgo de que los formatos digan cosas distintas. |
+| **Importación todo o nada** | Una importación parcial dejaría trayectorias incompletas que sesgan el modelo y los indicadores. |
+| **Auditoría que no tumba la operación** | Si registrar el evento falla, la operación principal sigue y el error se informa en el log. |
 
 ---
 
@@ -492,18 +577,36 @@ El docente ve únicamente sus cursos del periodo actual con la nota parcial, asi
 npm test
 ```
 
-**99 pruebas** en 8 archivos:
+**189 pruebas** en 18 archivos:
 
-- `calculadora-impacto.test.ts` (30): inversión, cuota francesa contra un valor verificado, deuda con y sin título, VPN vs nominal, horizontes, punto de equilibrio, escenarios, entradas inválidas.
-- `riesgo-modelo.test.ts` (15): el entrenador TS reproduce los coeficientes de scikit-learn, la explicación reconstruye exactamente la probabilidad, niveles, AUC y métricas.
-- `dashboard-calculos.test.ts` (12): Kaplan-Meier con casos calculados a mano y censura, tasas por cohorte, semestre y periodo, tasa anual, causas y KPIs.
-- `seed-integridad.test.ts` (12): llaves foráneas, unicidad, coherencia estado/retiro, rangos válidos y realismo de la deserción simulada.
-- `riesgo-caracteristicas.test.ts` (11): etiquetas del panel a dos semestres, exclusión de semestres censurados y vectorización.
-- `encuesta.test.ts` (8): puntajes extremos, preguntas invertidas, regla de intención de retiro y validación.
-- `conversores.test.ts` (6): conversión de parámetros y formatos.
-- `seed-academico.test.ts` (5): cursos, docentes e inscripciones coherentes con el periodo en curso.
+| Archivo | Pruebas | Qué verifica |
+|---|---|---|
+| `calculadora-impacto.test.ts` | 30 | Inversión, cuota francesa contra un valor verificado, deuda con y sin título, VPN vs. nominal, horizontes, punto de equilibrio, escenarios y entradas inválidas |
+| `importacion-importador.test.ts` | 16 | Archivo válido, alias, errores por fila y columna, consistencia por estudiante, todo o nada y plantilla |
+| `riesgo-reentrenamiento.test.ts` | 16 | El reentrenamiento reproduce scikit-learn, evalúa por estudiante, regla de recomendación, efecto de la regularización y nombre de versión |
+| `riesgo-modelo.test.ts` | 15 | Entrenador TS = scikit-learn, explicación exacta de la probabilidad, niveles, AUC y métricas |
+| `seed-integridad.test.ts` | 14 | Llaves foráneas, unicidad, coherencia estado/retiro/intervenciones y realismo de la deserción simulada |
+| `dashboard-calculos.test.ts` | 12 | Kaplan-Meier calculado a mano y censura, tasas por cohorte, semestre y periodo, causas y KPIs |
+| `reportes-generador.test.ts` | 11 | Formato colombiano, texto seguro en PDF, hojas de Excel y paginación |
+| `riesgo-caracteristicas.test.ts` | 11 | Etiquetas del panel a dos semestres, exclusión de semestres censurados y vectorización |
+| `impacto-institucional.test.ts` | 9 | Montos, línea base anual, cohortes con plazo vencido y proyección calculada a mano |
+| `encuesta.test.ts` | 8 | Puntajes extremos, preguntas invertidas, regla de intención de retiro y validación |
+| `importacion-csv.test.ts` | 8 | Lector de CSV: separador, comillas, BOM, finales de Windows y encabezados |
+| `intervenciones-analizador.test.ts` | 7 | Sesgo de selección, intervalo de confianza, franjas mínimas, efecto por tipo y cobertura |
+| `reportes-contenido.test.ts` | 7 | La lista de riesgo no tiene campos personales, efectos con signo y proyección creciente |
+| `admin-reglas.test.ts` | 6 | Índice de periodos, fechas, política de contraseñas y protección del último administrador |
+| `conversores.test.ts` | 6 | Conversión de parámetros y referencias SPADIES |
+| `seed-academico.test.ts` | 5 | Cursos, docentes e inscripciones coherentes con el periodo en curso |
+| `seguridad-bloqueo.test.ts` | 4 | Bloqueo tras 5 intentos, expiración a los 15 minutos y reinicio |
+| `seguridad-sesion.test.ts` | 4 | Revalidación de la sesión: cuenta activa, cambio de rol, cuenta desactivada o eliminada |
 
-Además, cada fase se verificó de punta a punta contra **PostgreSQL 16**: la migración `prisma/migrations` (estructura idéntica al esquema: columnas, tipos, restricciones, índices y enums), seed y re-seed, login de los 4 roles, matriz de permisos de todas las rutas y APIs (69 verificaciones), validaciones con mensajes en español, edición de parámetros reflejada en calculadora y dashboard, y el flujo completo en navegador (Chromium) en escritorio y móvil, sin errores de consola. En la Fase 2 se añadieron 61 verificaciones de API (lista priorizada, filtros y paginación, ficha, recálculo, alertas, permisos del docente por curso, encuesta con y sin consentimiento) y las pruebas de navegador de los nuevos módulos.
+Además, cada fase se verificó de punta a punta contra **PostgreSQL 16**: la migración `prisma/migrations` (estructura idéntica al esquema: columnas, tipos, restricciones, índices y enums), seed y re-seed, login de los 4 roles, matriz de permisos de todas las rutas y APIs (69 verificaciones), validaciones con mensajes en español, edición de parámetros reflejada en calculadora y dashboard, y el flujo completo en navegador (Chromium) en escritorio y móvil, sin errores de consola. En la Fase 2 se añadieron 61 verificaciones de API (lista priorizada, filtros y paginación, ficha, recálculo, alertas, permisos del docente por curso, encuesta con y sin consentimiento) y las pruebas de navegador de los nuevos módulos. En la Fase 3 se verificó lo siguiente:
+
+- Las tres migraciones, aplicadas sobre una base vacía, producen exactamente la estructura del esquema.
+- El seed de las tres fases carga sin errores.
+- La matriz completa de **16 páginas × 4 roles**: cada rol entra donde debe y en lo demás recibe "acceso denegado".
+- **110 verificaciones de API**: reentrenar, comparar, activar, activar de nuevo sin efecto y volver a la versión anterior; auditoría de esas acciones; permisos y validaciones; y que los reportes PDF y Excel sean archivos válidos.
+- El flujo en navegador de la pantalla del modelo (entrenar, confirmar con el diálogo, activar, volver atrás) y la revisión de todas las páginas nuevas en escritorio y móvil, sin desbordes horizontales ni errores de consola.
 
 
 ---
@@ -526,6 +629,22 @@ Además, cada fase se verificó de punta a punta contra **PostgreSQL 16**: la mi
 |---|---|
 | ![Panel docente](docs/capturas/panel-docente.png) | ![Encuesta](docs/capturas/encuesta.png) |
 
+| Intervenciones y efectividad | Impacto institucional y regional |
+|---|---|
+| ![Intervenciones](docs/capturas/intervenciones.png) | ![Impacto institucional](docs/capturas/impacto-institucional.png) |
+
+| Reportes PDF / Excel | Panel de administración |
+|---|---|
+| ![Reportes](docs/capturas/reportes.png) | ![Administración](docs/capturas/admin-panel.png) |
+
+| Modelo de riesgo: reentrenamiento | Usuarios y roles |
+|---|---|
+| ![Modelo](docs/capturas/admin-modelo.png) | ![Usuarios](docs/capturas/admin-usuarios.png) |
+
+| Importación CSV | Auditoría de accesos |
+|---|---|
+| ![Importación](docs/capturas/admin-importar.png) | ![Auditoría](docs/capturas/admin-auditoria.png) |
+
 ## 14. Colores institucionales
 
 Definidos en `tailwind.config.ts` (`ucc.azul`, `ucc.azul-oscuro`, `ucc.verde`...) y `app/globals.css`. Ajústalos con el manual de identidad visual oficial de la UCC si los tonos difieren.
@@ -538,3 +657,23 @@ Definidos en `tailwind.config.ts` (`ucc.azul`, `ucc.azul-oscuro`, `ucc.verde`...
 - Ley 1581 de 2012 — Protección de datos personales.
 
 Las participaciones nacionales por categoría de causa vienen como **valores ilustrativos** y deben reemplazarse con la distribución oficial antes de usarse como referencia.
+
+## 16. Historial de desarrollo (Git)
+
+El proyecto se desarrolló con **una rama por funcionalidad**, integrada a `main` con merge explícito (`--no-ff`), así que cada módulo se puede rastrear de principio a fin. Los mensajes siguen *Conventional Commits* en español:
+
+| Prefijo | Uso |
+|---|---|
+| `feat(ámbito)` | Funcionalidad nueva (`feat(admin)`, `feat(riesgo)`, `feat(api)`…) |
+| `fix(ámbito)` | Corrección de un error encontrado en pruebas o auditoría |
+| `test(ámbito)` | Pruebas automatizadas (normalmente antes o junto a la funcionalidad) |
+| `refactor`, `docs`, `build`, `chore` | Reorganización sin cambio de comportamiento, documentación, dependencias y versiones |
+
+Cada fase cerró con una **etiqueta**: `v0.1.0-fase1`, `v0.2.0-fase2` y `v0.3.0-fase3`.
+
+```bash
+git log --oneline --graph --decorate        # historial completo con las ramas integradas
+git log --oneline v0.2.0-fase2..v0.3.0-fase3 # lo que se hizo en la Fase 3
+git log --merges --oneline main             # una línea por funcionalidad integrada
+git show --stat v0.3.0-fase3                # contenido de la entrega final
+```
