@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/inicializar.ts && next build",
+    "db:init": "tsx prisma/inicializar.ts",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
