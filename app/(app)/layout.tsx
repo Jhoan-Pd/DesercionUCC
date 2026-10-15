@@ -1,16 +1,22 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { modulosParaRol } from "@/lib/modulos";
+import { puedeAcceder } from "@/lib/rbac";
 import { Sidebar } from "@/components/layout/Sidebar";
 
 export const dynamic = "force-dynamic";
 
-/** Layout de todas las páginas autenticadas: valida sesión y arma el menú según el rol */
+/** Layout de todas las páginas autenticadas: valida la sesión (revalidada contra la BD), el permiso de la ruta y arma el menú según el rol */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
+  if (session.revocada) redirect("/login?motivo=cuenta-desactivada");
   const { rol, name, email } = session.user;
+  // Segunda verificación del permiso con el rol actual (el middleware usa el rol guardado en el token)
+  const ruta = headers().get("x-ruta");
+  if (ruta && !puedeAcceder(ruta, rol)) redirect("/acceso-denegado");
 
   return (
     <div className="min-h-screen">

@@ -3,6 +3,8 @@ import type { Rol } from "@/lib/roles";
 
 declare module "next-auth" {
   interface Session {
+    /** true si la cuenta fue desactivada o eliminada después de iniciar sesión */
+    revocada?: boolean;
     user: {
       id: string;
       rol: Rol;
@@ -21,5 +23,6 @@ declare module "next-auth/jwt" {
     uid: string;
     rol: Rol;
     estudianteId: string | null;
+    revocada?: boolean;
   }
 }

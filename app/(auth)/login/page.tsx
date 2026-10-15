@@ -4,13 +4,15 @@ import { GraduationCap } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { rutaInicial } from "@/lib/rbac";
 import { FormularioLogin } from "@/components/layout/FormularioLogin";
+import { Alert } from "@/components/ui/alert";
 
 export const metadata = { title: "Iniciar sesión" };
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage({ searchParams }: { searchParams: { callbackUrl?: string } }) {
+export default async function LoginPage({ searchParams }: { searchParams: { callbackUrl?: string; motivo?: string } }) {
   const session = await getServerSession(authOptions);
-  if (session) redirect(rutaInicial(session.user.rol));
+  // Una sesión revocada (cuenta desactivada) no redirige: se muestra el aviso y se puede entrar con otra cuenta
+  if (session && !session.revocada) redirect(rutaInicial(session.user.rol));
 
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
@@ -35,6 +37,11 @@ export default async function LoginPage({ searchParams }: { searchParams: { call
             <h2 className="text-2xl font-bold">Iniciar sesión</h2>
             <p className="text-sm text-muted-foreground">Ingresa con tu correo institucional.</p>
           </div>
+          {(searchParams.motivo === "cuenta-desactivada" || session?.revocada) && (
+            <Alert variant="warning" titulo="Tu sesión se cerró">
+              La cuenta fue desactivada por el administrador. Si crees que es un error, comunícate con el administrador del observatorio.
+            </Alert>
+          )}
           <FormularioLogin callbackUrl={searchParams.callbackUrl} />
           <p className="text-xs text-muted-foreground">
             Tus datos se tratan conforme a la Ley 1581 de 2012 (habeas data). Solo el personal autorizado puede ver información individual.

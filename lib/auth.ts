@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { esRol } from "@/lib/roles";
 import { ERROR_CUENTA_BLOQUEADA, ESTADO_LIMPIO, consultarBloqueo, registrarFallo } from "@/lib/seguridad/bloqueo";
+import { revalidarSesion } from "@/lib/seguridad/sesion";
 import { ServicioAuditoria } from "@/services/auditoria/ServicioAuditoria";
 
 const credencialesSchema = z.object({
@@ -15,8 +16,9 @@ const credencialesSchema = z.object({
 /**
  * Configuración de Auth.js (NextAuth v4).
  * - Proveedor de credenciales (correo + contraseña con hash bcrypt).
- * - Estrategia JWT: la sesión viaja en una cookie firmada (sin consultar la BD en cada petición),
- *   lo que además permite que el middleware (Edge) lea el rol sin acceder a Prisma.
+ * - Estrategia JWT: la sesión viaja en una cookie firmada, lo que permite que el middleware (Edge)
+ *   filtre por rol sin acceder a Prisma. En el servidor, cada petición revalida la cuenta contra la
+ *   BD (activa y rol actual), así una cuenta desactivada pierde el acceso de inmediato.
  */
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt", maxAge: 60 * 60 * 8 }, // 8 horas
@@ -71,13 +73,25 @@ export const authOptions: NextAuthOptions = {
         token.uid = user.id;
         token.rol = user.rol;
         token.estudianteId = user.estudianteId;
+        token.revocada = false;
+        return token;
       }
-      return token;
+      if (!token.uid) return token;
+      // Revalidación en cada petición del servidor: desactivar una cuenta o cambiarle el rol
+      // surte efecto de inmediato, sin esperar a que el JWT expire (ver lib/seguridad/sesion.ts)
+      const cuenta = await prisma.usuario.findUnique({
+        where: { id: token.uid },
+        select: { activo: true, estudianteId: true, rol: { select: { nombre: true } } },
+      });
+      const r = revalidarSesion(cuenta ? { activo: cuenta.activo, rol: cuenta.rol.nombre, estudianteId: cuenta.estudianteId } : null);
+      if (!r.valida) return { ...token, revocada: true };
+      return { ...token, rol: r.rol, estudianteId: r.estudianteId, revocada: false };
     },
     async session({ session, token }) {
       session.user.id = token.uid;
       session.user.rol = token.rol;
       session.user.estudianteId = token.estudianteId;
+      session.revocada = token.revocada === true;
       return session;
     },
   },
