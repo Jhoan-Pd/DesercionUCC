@@ -12,7 +12,7 @@ export interface Modulo {
 }
 
 /** Menú lateral y páginas "próximamente". Los módulos con fase > FASE_ACTUAL aparecen deshabilitados. */
-export const FASE_ACTUAL = 2;
+export const FASE_ACTUAL = 3;
 
 export const MODULOS: Modulo[] = [
   { href: "/dashboard", titulo: "Dashboard institucional", descripcion: "Deserción por cohorte, programa, semestre y periodo; curvas de supervivencia y causas.", icono: "dashboard", roles: ["ADMIN", "BIENESTAR"], fase: 1 },
