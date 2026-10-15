@@ -2,14 +2,14 @@ import { notFound, redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { Construction } from "lucide-react";
 import { authOptions } from "@/lib/auth";
-import { MODULOS } from "@/lib/modulos";
+import { FASE_ACTUAL, MODULOS } from "@/lib/modulos";
 import { Card, CardContent } from "@/components/ui/card";
 
-/** Páginas de módulos que se entregan en fases posteriores (2 y 3) */
+/** Página "próximamente" para módulos de fases que aún no se han entregado (FASE_ACTUAL) */
 export default async function ProximamentePage({ params }: { params: { modulo: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
-  const modulo = MODULOS.find((m) => m.href === `/${params.modulo}` && m.fase > 1);
+  const modulo = MODULOS.find((m) => m.href === `/${params.modulo}` && m.fase > FASE_ACTUAL);
   if (!modulo) notFound();
   if (!modulo.roles.includes(session.user.rol)) redirect("/acceso-denegado");
 
