@@ -7,6 +7,7 @@
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { urlParaPrisma } from "../lib/url-base-datos";
 import { generarDataset } from "./seed/generador";
 import { generarCursos, type DocenteSeed } from "./seed/academico";
 import { Aleatorio, acotar } from "./seed/aleatorio";
@@ -16,7 +17,7 @@ import { MODELO_BASE, factoresParaGuardar, motivoAlertaModelo, puntuarRegistros 
 import { EvaluadorEncuesta } from "../services/encuesta/EvaluadorEncuesta";
 import { PREGUNTAS } from "../services/encuesta/preguntas";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ datasourceUrl: urlParaPrisma(process.env.DATABASE_URL) });
 
 /** Inserta en lotes para no exceder el límite de parámetros de Postgres */
 async function insertarPorLotes<T>(items: T[], insertar: (lote: T[]) => Promise<unknown>, tamano = 1000): Promise<void> {
