@@ -28,6 +28,10 @@ erDiagram
     ESTUDIANTES ||--o{ INSCRIPCIONES : "cursa"
     CURSOS |o--o{ ALERTAS : "reportada desde"
     USUARIOS |o--o{ MODELOS_RIESGO : "entrenó"
+    PERIODOS |o--o{ INTERVENCIONES : "realizada en"
+    ALERTAS |o--o{ INTERVENCIONES : "origina"
+    USUARIOS ||--o{ IMPORTACIONES : "carga"
+    USUARIOS ||--o{ AUDITORIA_ACCESOS : "deja rastro en"
 
     ROLES {
         int id PK
@@ -43,6 +47,8 @@ erDiagram
         int rolId FK
         uuid estudianteId FK "UK, solo rol ESTUDIANTE"
         datetime ultimoAcceso
+        int intentosFallidos "bloqueo tras 5 fallos"
+        datetime bloqueadoHasta
     }
     PROGRAMAS {
         uuid id PK
@@ -170,6 +176,9 @@ erDiagram
         string descripcion
         int montoApoyo
         enum estado
+        uuid periodoId FK
+        uuid alertaId FK
+        string resultado
     }
     PARAMETROS_ECONOMICOS {
         uuid id PK
@@ -208,4 +217,23 @@ erDiagram
         json metricas "AUC, Brier, calibración"
         boolean activo
         uuid entrenadoPorId FK
+    }
+    IMPORTACIONES {
+        uuid id PK
+        string archivo
+        int filas
+        int estudiantesNuevos
+        int estudiantesActualizados
+        int semestres
+        uuid usuarioId FK
+        datetime creadaEn
+    }
+    AUDITORIA_ACCESOS {
+        uuid id PK
+        uuid usuarioId FK
+        string rol
+        string accion "CONSULTA_FICHA, EXPORTACION, ADMIN_MODELO..."
+        string recurso "código anónimo, nunca nombres"
+        string detalle
+        datetime creadoEn
     }
