@@ -12,5 +12,6 @@ export const SECCIONES_ADMIN: SeccionAdmin[] = [
   { href: "/admin/periodos", titulo: "Periodos académicos", descripcion: "Fechas de cada semestre y cuál es el periodo actual.", icono: "periodos" },
   { href: "/admin/importar", titulo: "Importar estudiantes (CSV)", descripcion: "Carga de datos reales de Registro Académico con validación de columnas.", icono: "importar" },
   { href: "/admin/usuarios", titulo: "Usuarios y roles", descripcion: "Crear cuentas, cambiar roles, desactivar, restablecer contraseñas y desbloquear.", icono: "usuarios" },
+  { href: "/admin/modelo", titulo: "Modelo de riesgo", descripcion: "Reentrenar con los datos actuales, comparar con la versión activa y activar o volver a una anterior.", icono: "modelo" },
   { href: "/admin/auditoria", titulo: "Auditoría de accesos", descripcion: "Quién consultó datos individuales, exportó, importó o cambió la configuración.", icono: "auditoria" },
 ];
