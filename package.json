@@ -1,11 +1,13 @@
 {
   "name": "observatorio-desercion-ucc",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Observatorio de Deserción UCC - mide el impacto de desertar y detecta estudiantes en riesgo",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/inicializar.ts && next build",
+    "db:init": "tsx prisma/inicializar.ts",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
