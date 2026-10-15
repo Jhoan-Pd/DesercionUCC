@@ -291,7 +291,7 @@ erDiagram
 ### Requisitos
 
 - **Node.js 18.18 o superior** (recomendado 20 LTS): `node -v`
-- Una base de datos PostgreSQL. Lo más simple es usar **el mismo proyecto gratuito de Supabase o Neon** que usarás en producción (sección 8). Alternativa con Docker:
+- Una base de datos PostgreSQL. Puedes usar una rama de desarrollo de Neon (sección 8.4) o Docker:
   `docker run --name pg-ucc -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=observatorio -p 5432:5432 -d postgres:16`
 
 > **Windows + OneDrive:** no instales el proyecto dentro de una carpeta sincronizada con OneDrive (por ejemplo `Escritorio` cuando está respaldado). `npm install` crea decenas de miles de archivos en `node_modules`; OneDrive intenta subirlos y suele provocar errores `EPERM`/`EBUSY` y lentitud. Copia la carpeta a una ruta local, por ejemplo `C:\dev\observatorio-desercion-ucc`, y trabaja desde ahí (en GitHub y Vercel no cambia nada).
@@ -305,7 +305,7 @@ npm install
 
 # 2. Crear el archivo de variables de entorno
 cp .env.example .env          # Windows PowerShell:  Copy-Item .env.example .env
-#    ...y editar .env con tu DATABASE_URL, DIRECT_URL y NEXTAUTH_SECRET (sección 7)
+#    ...y editar .env con tu DATABASE_URL, DATABASE_URL_UNPOOLED y NEXTAUTH_SECRET (sección 7)
 
 # 3. Crear las tablas (aplica prisma/migrations)
 npx prisma migrate deploy
@@ -347,11 +347,14 @@ La contraseña de todas es la de la variable `SEED_DEMO_PASSWORD` del `.env` (va
 
 | Variable | Descripción | Ejemplo |
 |---|---|---|
-| `DATABASE_URL` | Conexión que usa la app (en Vercel: **con pooler**) | `postgresql://...:6543/postgres?pgbouncer=true&connection_limit=1` |
-| `DIRECT_URL` | Conexión directa para migraciones de Prisma | `postgresql://...:5432/postgres` |
+| `DATABASE_URL` | Conexión que usa la app (en Vercel: **con pooler**). Si es un pooler, la app agrega `pgbouncer=true` sola (`lib/url-base-datos.ts`) | `postgresql://...-pooler.../neondb?sslmode=require` |
+| `DATABASE_URL_UNPOOLED` | Conexión directa para las migraciones de Prisma | `postgresql://.../neondb?sslmode=require` |
 | `NEXTAUTH_SECRET` | Secreto para firmar la sesión (mínimo 32 caracteres aleatorios) | ver abajo |
-| `NEXTAUTH_URL` | URL pública de la app | `http://localhost:3000` / `https://tu-app.vercel.app` |
+| `NEXTAUTH_URL` | URL pública de la app (en Vercel es opcional) | `http://localhost:3000` / `https://tu-app.vercel.app` |
 | `SEED_DEMO_PASSWORD` | Contraseña de las cuentas demo (solo la usa el seed) | |
+| `FORZAR_SEED` | Opcional. `1` recarga los datos de demostración en el siguiente despliegue (borra lo existente) | |
+
+Los nombres `DATABASE_URL` y `DATABASE_URL_UNPOOLED` son los que crea automáticamente la integración **Neon–Vercel**, así que en Vercel no hay que copiar cadenas de conexión a mano.
 
 Generar `NEXTAUTH_SECRET`:
 
@@ -363,35 +366,9 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 ---
 
-## 8. Despliegue paso a paso (Supabase o Neon + Vercel)
+## 8. Despliegue paso a paso (Vercel + Neon)
 
-### 8.1 Base de datos
-
-**Opción A — Supabase**
-
-1. Entra a <https://supabase.com>, crea un proyecto (región recomendada: **South America (São Paulo)**) y guarda la contraseña de la base de datos.
-2. Botón **Connect** → pestaña **ORMs** → **Prisma**. Copia las dos cadenas:
-   - `DATABASE_URL` → la del **Transaction pooler** (puerto **6543**) y agrega al final `&connection_limit=1` (si no tiene `?`, usa `?pgbouncer=true&connection_limit=1`).
-   - `DIRECT_URL` → la del **Session pooler / conexión directa** (puerto **5432**).
-3. Reemplaza `[YOUR-PASSWORD]` por tu contraseña.
-
-**Opción B — Neon**
-
-1. Entra a <https://neon.tech>, crea un proyecto (región cercana, p. ej. AWS São Paulo o US East).
-2. En **Connection Details**: con **Connection pooling** activado copia la cadena para `DATABASE_URL` (host con `-pooler`) y agrega `&pgbouncer=true&connection_limit=1`; desactívalo y copia la otra para `DIRECT_URL`. Ambas deben terminar con `sslmode=require`.
-
-### 8.2 Crear las tablas y cargar los datos (desde tu PC, una sola vez)
-
-Pon esas dos cadenas en tu `.env` local y ejecuta:
-
-```bash
-npx prisma migrate deploy
-npm run db:seed
-```
-
-Debe mostrar `✅ Seed completado` con 1.500 estudiantes.
-
-### 8.3 Subir el código a GitHub
+### 8.1 Subir el código a GitHub
 
 El proyecto **ya es un repositorio Git** con todo el historial de desarrollo (ver sección 16). Crea un repositorio **vacío** en github.com (sin README ni .gitignore) y sube todas las ramas y etiquetas:
 
@@ -405,26 +382,39 @@ git push origin --tags     # v0.1.0-fase1, v0.2.0-fase2, v0.3.0-fase3
 
 El `.gitignore` ya excluye `.env` y `node_modules`: **nunca subas tu `.env`**.
 
-### 8.4 Vercel
+### 8.2 Crear el proyecto en Vercel
 
 1. Entra a <https://vercel.com> con tu cuenta de GitHub → **Add New… → Project** → importa el repositorio.
-2. Framework: **Next.js** (se detecta solo). Deja el *Build Command* por defecto (`npm run build`, que ejecuta `prisma generate && next build`).
-3. En **Environment Variables** agrega: `DATABASE_URL`, `DIRECT_URL`, `NEXTAUTH_SECRET` y `NEXTAUTH_URL` (pon temporalmente `https://observatorio-desercion-ucc.vercel.app` o el nombre que elijas).
-4. **Deploy**. Cuando termine, copia la URL real (Settings → Domains), actualiza `NEXTAUTH_URL` con ella y haz **Redeploy**.
-5. Prueba: abre la URL, entra con `bienestar@ucc.edu.co` y revisa el dashboard; luego con `estudiante@ucc.edu.co` y calcula el impacto.
+2. Framework: **Next.js** (se detecta solo). No cambies el *Build Command*: Vercel ejecuta automáticamente el script `vercel-build` de `package.json`, que hace `prisma generate`, `prisma migrate deploy` (crea o actualiza las tablas), `prisma/inicializar.ts` (carga los datos de demostración **solo si la base está vacía**) y `next build`.
+3. En **Environment Variables** agrega `NEXTAUTH_SECRET` y `SEED_DEMO_PASSWORD` (la contraseña que tendrán las cuentas demo en la URL pública).
 
-> Consejo: en Vercel → Settings → Functions, elige la región de las funciones **igual o cercana** a la de la base de datos (p. ej. `gru1` São Paulo si usas Supabase São Paulo) para que las consultas sean rápidas.
+### 8.3 Crear la base de datos (Neon desde Vercel)
+
+1. En el proyecto de Vercel → pestaña **Storage** → **Create Database** → **Neon** (Serverless Postgres, plan gratuito). Elige la región `Washington, D.C., USA (East) - iad1` para que quede junto a las funciones de Vercel.
+2. Conéctala al proyecto en los entornos **Production** y **Preview**. Vercel agrega solo `DATABASE_URL` (con pooler) y `DATABASE_URL_UNPOOLED` (directa), entre otras.
+3. **Deployments → Redeploy** (o haz un nuevo `git push`). En el registro del build debe aparecer `🌱 Base de datos vacía: cargando datos de demostración...` y luego `✅ Seed completado`. En los despliegues siguientes aparecerá `ℹ️ La base de datos ya tiene … usuarios`, es decir, **no se borran los datos de producción**.
+4. Prueba: abre la URL, entra con `bienestar@ucc.edu.co` y revisa el dashboard; luego con `estudiante@ucc.edu.co` y calcula el impacto.
+
+> **Supabase en lugar de Neon:** crea el proyecto en <https://supabase.com> (Connect → ORMs → Prisma) y en Vercel agrega a mano `DATABASE_URL` (Transaction pooler, puerto 6543) y `DATABASE_URL_UNPOOLED` (Session pooler o conexión directa, puerto 5432). El resto es igual.
+
+### 8.4 Base de datos para desarrollo local
+
+Puedes usar la base local de Docker (sección 6) o una rama de desarrollo de Neon: copia las dos cadenas de Neon (**Connect** → con y sin *Connection pooling*) a tu `.env` local y ejecuta:
+
+```bash
+npx prisma migrate deploy
+npm run db:init          # carga los datos solo si la base está vacía (npm run db:seed los recarga siempre)
+```
 
 ### 8.5 Solución de problemas
 
 | Síntoma | Causa probable y solución |
 |---|---|
-| `Environment variable not found: DIRECT_URL` | Falta `DIRECT_URL` en `.env` o en Vercel. |
-| `prepared statement "s0" already exists` | `DATABASE_URL` usa el pooler sin `?pgbouncer=true`. |
-| Login vuelve a /login sin error en Vercel | `NEXTAUTH_URL` no coincide con la URL real o falta `NEXTAUTH_SECRET`. Corrige y haz Redeploy. |
-| `Can't reach database server` | Cadena de conexión o contraseña incorrecta; en Neon falta `sslmode=require`. |
-| `prisma migrate deploy` falla con el pooler | Las migraciones usan `DIRECT_URL` (puerto 5432): revísala. Alternativa: `npx prisma db push`. |
-| El dashboard aparece vacío | No se ejecutó `npm run db:seed` contra esa base de datos. |
+| `Environment variable not found: DATABASE_URL_UNPOOLED` | Falta la base de datos conectada al proyecto (Storage) o la variable en tu `.env`. |
+| `prepared statement "s0" already exists` | Se está usando un pooler sin `pgbouncer=true`; la app lo agrega sola, revisa que `DATABASE_URL` sea la del pooler. |
+| Login vuelve a /login sin error en Vercel | Falta `NEXTAUTH_SECRET` (o `NEXTAUTH_URL` no coincide con la URL real). Corrige y haz Redeploy. |
+| `Can't reach database server` | Cadena de conexión incorrecta o la base de Neon está en pausa (se reactiva sola al primer acceso; reintenta). |
+| El dashboard aparece vacío | El build no cargó datos: revisa en el registro si aparece `Seed completado`; puedes forzarlo con `FORZAR_SEED=1` y Redeploy. |
 
 ---
 
