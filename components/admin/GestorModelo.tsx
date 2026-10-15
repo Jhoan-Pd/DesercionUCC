@@ -33,12 +33,21 @@ interface ResultadoActivacion {
   recalculo: { estudiantes: number; alto: number; medio: number; alertasNuevas: number } | null;
 }
 
+/** Solo se resalta una diferencia que se alcanza a ver con los decimales mostrados (si no, es un empate) */
+function comparar(nuevo: number, actual: number, decimales: number, mejorEs: "mayor" | "menor"): boolean | null {
+  const f = 10 ** decimales;
+  const n = Math.round(nuevo * f);
+  const a = Math.round(actual * f);
+  if (n === a) return null;
+  return mejorEs === "mayor" ? n > a : n < a;
+}
+
 function Comparacion({ v }: { v: VersionModeloDTO }) {
   const c = v.comparacion;
   if (!c) return <p className="text-sm text-muted-foreground">No había un modelo activo con el cual comparar.</p>;
   const filas: { metrica: string; ayuda: string; actual: string; nuevo: string; mejor: boolean | null }[] = [
-    { metrica: "AUC", ayuda: "mayor es mejor", actual: dec(c.auc.actual), nuevo: dec(c.auc.nuevo), mejor: c.auc.nuevo === c.auc.actual ? null : c.auc.nuevo > c.auc.actual },
-    { metrica: "Brier", ayuda: "menor es mejor", actual: dec(c.brier.actual, 4), nuevo: dec(c.brier.nuevo, 4), mejor: c.brier.nuevo === c.brier.actual ? null : c.brier.nuevo < c.brier.actual },
+    { metrica: "AUC", ayuda: "mayor es mejor", actual: dec(c.auc.actual), nuevo: dec(c.auc.nuevo), mejor: comparar(c.auc.nuevo, c.auc.actual, 3, "mayor") },
+    { metrica: "Brier", ayuda: "menor es mejor", actual: dec(c.brier.actual, 4), nuevo: dec(c.brier.nuevo, 4), mejor: comparar(c.brier.nuevo, c.brier.actual, 4, "menor") },
     { metrica: "Sensibilidad ALTO", ayuda: "desertores detectados", actual: pct(c.sensibilidadAlto.actual), nuevo: pct(c.sensibilidadAlto.nuevo), mejor: null },
     { metrica: "Precisión ALTO", ayuda: "aciertos al marcar ALTO", actual: pct(c.precisionAlto.actual), nuevo: pct(c.precisionAlto.nuevo), mejor: null },
   ];
@@ -226,7 +235,9 @@ export function GestorModelo({ resumen }: { resumen: ResumenModelos }) {
       <Card>
         <CardHeader>
           <CardTitle>Historial de versiones</CardTitle>
-          <CardDescription>Puedes volver a una versión anterior en cualquier momento; los puntajes se recalculan al activarla.</CardDescription>
+          <CardDescription>
+            Puedes volver a una versión anterior en cualquier momento; los puntajes se recalculan al activarla. El AUC y el Brier de cada fila se midieron en la partición de prueba de su propio entrenamiento (Python y el panel separan estudiantes distintos), así que para decidir entre dos versiones usa la comparación sobre las mismas filas que aparece al entrenar.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
