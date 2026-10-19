@@ -40,6 +40,8 @@ export function manejar(roles: Rol[] | null, handler: (ctx: Contexto) => Promise
       if (resultado instanceof Response) return resultado;
       return NextResponse.json(resultado);
     } catch (error) {
+      // Next.js usa esta excepción para marcar la ruta como dinámica durante el build: debe propagarse
+      if ((error as { digest?: string } | null)?.digest === "DYNAMIC_SERVER_USAGE") throw error;
       return respuestaDeError(error);
     }
   };
