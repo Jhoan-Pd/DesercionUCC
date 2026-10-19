@@ -1,44 +1,25 @@
 /**
- * Inicialización de la base de datos durante el despliegue (Vercel ejecuta `npm run vercel-build`).
+ * Inicialización de la base de datos durante el despliegue (Vercel ejecuta `npm run vercel-build`
+ * después de `prisma migrate deploy`).
  *
- * Carga los datos de demostración SOLO si la base está vacía (sin usuarios). Así el primer
- * despliegue deja la aplicación lista para usar y los siguientes NO borran lo que se haya
- * registrado en producción (intervenciones, alertas, cambios de parámetros, importaciones...).
- *
- * Para recargar los datos a propósito: variable de entorno FORZAR_SEED=1 en un despliegue.
+ * Solo crea la cuenta del primer administrador cuando no existe ninguno. No carga datos de ejemplo:
+ * los estudiantes se cargan desde la página "Cargar datos" con información real de la universidad.
  */
-import { spawnSync } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
 import { urlParaPrisma } from "../lib/url-base-datos";
-
-export function debeSembrar(usuarios: number, forzar: string | undefined): boolean {
-  return usuarios === 0 || forzar === "1";
-}
+import { crearAdministradorInicial } from "./seed";
 
 async function main() {
   const prisma = new PrismaClient({ datasourceUrl: urlParaPrisma(process.env.DATABASE_URL) });
-  let usuarios: number;
   try {
-    usuarios = await prisma.usuario.count();
+    const r = await crearAdministradorInicial(prisma);
+    console.log(r === "creado" ? "👤 Se creó la cuenta del primer administrador." : "ℹ️  Ya hay un administrador: no se crean cuentas.");
+  } catch (e) {
+    // No se detiene el despliegue: la página funciona y el aviso queda en el log del build
+    console.warn("⚠️ ", e instanceof Error ? e.message : e);
   } finally {
     await prisma.$disconnect();
   }
-
-  if (!debeSembrar(usuarios, process.env.FORZAR_SEED)) {
-    console.log(`ℹ️  La base de datos ya tiene ${usuarios} usuarios: no se cargan datos de demostración.`);
-    return;
-  }
-  if (!process.env.SEED_DEMO_PASSWORD) {
-    console.warn("⚠️  SEED_DEMO_PASSWORD no está definida: las cuentas demo usarán la contraseña de ejemplo del README. Cámbiala.");
-  }
-  console.log(usuarios === 0 ? "🌱 Base de datos vacía: cargando datos de demostración..." : "🌱 FORZAR_SEED=1: recargando datos de demostración...");
-  const r = spawnSync("npx", ["prisma", "db", "seed"], { stdio: "inherit", env: process.env });
-  if (r.status !== 0) throw new Error(`El seed terminó con código ${r.status}`);
 }
 
-if (process.argv[1] && process.argv[1].endsWith("inicializar.ts")) {
-  main().catch((e) => {
-    console.error("❌ No se pudo inicializar la base de datos:", e);
-    process.exit(1);
-  });
-}
+main();

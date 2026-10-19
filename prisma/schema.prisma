@@ -1,12 +1,13 @@
 // =====================================================================
 // Observatorio de Deserción UCC — Esquema de base de datos (PostgreSQL)
 // =====================================================================
-// Decisiones clave (para sustentar):
-//  - IDs uuid: evitan enumeración de registros y permiten generarlos en el seed
-//    antes de insertar (createMany masivo con relaciones consistentes).
-//  - Montos en pesos colombianos como Int (COP no usa decimales en la práctica).
-//  - Roles en tabla propia (normalizada): permite agregar roles sin migrar enums.
-//  - Datos personales mínimos + hash anónimo por estudiante para reportes (Ley 1581/2012).
+// Versión simplificada (v0.4):
+//  - Solo datos REALES: los estudiantes los carga el administrador desde un archivo de la
+//    universidad. No hay datos simulados; la base arranca vacía (solo la cuenta del administrador).
+//  - Dos roles: ADMIN (carga datos y gestiona cuentas) y BIENESTAR (consulta el riesgo y usa el agente).
+//  - El riesgo se guarda por estudiante (Evaluacion) junto con los factores que lo explican y,
+//    cuando se pide, la explicación redactada por el agente de IA.
+//  - Las cifras oficiales de datos.gov.co no van en la base: se leen de data/datos-abiertos/ucc.json.
 // =====================================================================
 
 generator client {
@@ -19,36 +20,15 @@ datasource db {
   directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
-// ---------------------------------------------------------------------
-// Enums
-// ---------------------------------------------------------------------
+enum Rol {
+  ADMIN
+  BIENESTAR
+}
 
 enum EstadoEstudiante {
   ACTIVO
+  RETIRADO
   GRADUADO
-  DESERTOR
-  APLAZADO
-}
-
-enum Sexo {
-  F
-  M
-  O
-}
-
-enum TipoFinanciacion {
-  RECURSOS_PROPIOS
-  ICETEX
-  BECA
-  CREDITO_UCC
-}
-
-/// Categorías de determinantes de deserción según el MEN (SPADIES)
-enum CategoriaCausa {
-  INDIVIDUAL
-  ACADEMICA
-  SOCIOECONOMICA
-  INSTITUCIONAL
 }
 
 enum NivelRiesgo {
@@ -57,485 +37,117 @@ enum NivelRiesgo {
   ALTO
 }
 
-enum EstadoAlerta {
-  ABIERTA
-  EN_SEGUIMIENTO
-  CERRADA
-}
-
-enum OrigenAlerta {
-  DOCENTE
-  MODELO
-  ENCUESTA
-  BIENESTAR
-}
-
-enum TipoIntervencion {
-  TUTORIA
-  APOYO_ECONOMICO
-  ACOMPANAMIENTO_PSICOLOGICO
-  ORIENTACION_VOCACIONAL
-  OTRO
-}
-
-enum EstadoIntervencion {
-  EN_CURSO
-  COMPLETADA
-  CANCELADA
-}
-
-enum DimensionEncuesta {
-  ECONOMICA
-  ACADEMICA
-  MOTIVACION
-  ENTORNO
-}
-
-enum CategoriaParametro {
-  SALARIO
-  COSTO
-  FINANCIERO
-  ESCENARIO
-  SPADIES
-}
-
-// ---------------------------------------------------------------------
-// Usuarios y roles
-// ---------------------------------------------------------------------
-
-model Rol {
-  id          Int       @id @default(autoincrement())
-  nombre      String    @unique // ADMIN | BIENESTAR | DOCENTE | ESTUDIANTE
-  descripcion String
-  usuarios    Usuario[]
-
-  @@map("roles")
-}
-
 model Usuario {
-  id               String      @id @default(uuid())
-  email            String      @unique
+  id               String    @id @default(uuid())
+  email            String    @unique
   nombre           String
   passwordHash     String
-  activo           Boolean     @default(true)
-  rolId            Int
-  rol              Rol         @relation(fields: [rolId], references: [id])
-  /// Si el usuario es ESTUDIANTE, enlaza con su registro académico
-  estudianteId     String?     @unique
-  estudiante       Estudiante? @relation(fields: [estudianteId], references: [id])
-  creadoEn         DateTime    @default(now())
-  ultimoAcceso     DateTime?
-  /// Protección contra fuerza bruta: intentos fallidos seguidos y bloqueo temporal
-  intentosFallidos Int         @default(0)
+  rol              Rol
+  activo           Boolean   @default(true)
+  /// Protección contra fuerza bruta (lib/seguridad/bloqueo.ts)
+  intentosFallidos Int       @default(0)
   bloqueadoHasta   DateTime?
+  ultimoAcceso     DateTime?
+  creadoEn         DateTime  @default(now())
+  actualizadoEn    DateTime  @updatedAt
+  cargas           Carga[]
 
-  alertasCreadas     Alerta[]
-  intervenciones     Intervencion[]
-  parametrosEditados ParametroEconomico[]
-  /// Cursos que dicta (rol DOCENTE)
-  cursos             Curso[]
-  /// Versiones del modelo de riesgo que entrenó (rol ADMIN)
-  modelosEntrenados  ModeloRiesgo[]
-  importaciones      Importacion[]
-  auditorias         AuditoriaAcceso[]
-
-  @@index([rolId])
   @@map("usuarios")
 }
 
-// ---------------------------------------------------------------------
-// Catálogos académicos
-// ---------------------------------------------------------------------
+/// Cada archivo de estudiantes que sube el administrador (trazabilidad de la información)
+model Carga {
+  id           String       @id @default(uuid())
+  archivo      String
+  filas        Int
+  nuevos       Int
+  actualizados Int
+  /// Filas rechazadas: [{ fila, mensaje }]
+  errores      Json
+  usuarioId    String
+  usuario      Usuario      @relation(fields: [usuarioId], references: [id])
+  creadaEn     DateTime     @default(now())
+  estudiantes  Estudiante[]
 
-model Programa {
-  id                String  @id @default(uuid())
-  nombre            String  @unique
-  facultad          String
-  duracionSemestres Int
-  /// Valor de matrícula por semestre (COP)
-  valorSemestre     Int
-  activo            Boolean @default(true)
-
-  estudiantes Estudiante[]
-  parametros  ParametroEconomico[]
-  cursos      Curso[]
-
-  @@map("programas")
+  @@index([creadaEn])
+  @@map("cargas")
 }
 
-model Periodo {
-  id          String   @id @default(uuid())
-  codigo      String   @unique // "2024-1"
-  anio        Int
-  semestre    Int // 1 o 2
-  /// Posición cronológica (0 = 2018-1). Facilita cálculos de cohorte/supervivencia
-  indice      Int      @unique
-  fechaInicio DateTime
-  fechaFin    DateTime
-  activo      Boolean  @default(false)
-
-  matriculas         Matricula[]
-  notas              NotaSemestre[]
-  retiros            Retiro[]
-  estudiantesIngreso Estudiante[]
-  puntajes           PuntajeRiesgo[]
-  cursos             Curso[]
-  intervenciones     Intervencion[]
-
-  @@map("periodos")
-}
-
-// ---------------------------------------------------------------------
-// Estudiantes y su trayectoria
-// ---------------------------------------------------------------------
-
+/// Estudiante tal como viene en el archivo de la universidad. Los campos opcionales que falten
+/// simplemente no se usan en el cálculo del riesgo (nunca se inventan).
 model Estudiante {
-  id                  String           @id @default(uuid())
-  codigo              String           @unique
-  /// Identificador anonimizado para reportes y exportaciones
-  hashAnonimo         String           @unique
-  nombres             String
-  apellidos           String
-  sexo                Sexo
-  edadIngreso         Int
-  estrato             Int
-  municipioOrigen     String
-  departamentoOrigen  String
-  trabaja             Boolean          @default(false)
-  horasTrabajoSemana  Int              @default(0)
-  programaId          String
-  programa            Programa         @relation(fields: [programaId], references: [id])
-  periodoIngresoId    String
-  periodoIngreso      Periodo          @relation(fields: [periodoIngresoId], references: [id])
-  /// Cohorte denormalizada ("2021-1") para filtros y agrupaciones rápidas
-  cohorte             String
-  cohorteAnio         Int
-  semestreActual      Int
-  estado              EstadoEstudiante @default(ACTIVO)
-  /// Habeas data (Ley 1581/2012): consentimiento para tratamiento de datos
-  consentimientoDatos Boolean          @default(false)
-  fechaConsentimiento DateTime?
-  creadoEn            DateTime         @default(now())
+  id               String           @id @default(uuid())
+  codigo           String           @unique
+  nombre           String
+  programa         String
+  semestre         Int
+  /// Promedio acumulado (escala 0-5)
+  promedio         Float?
+  /// Materias perdidas en el último periodo
+  materiasPerdidas Int?
+  /// Porcentaje de asistencia (0-100)
+  asistencia       Float?
+  estrato          Int?
+  trabaja          Boolean?
+  /// Tiene beca, crédito o subsidio para la matrícula
+  apoyoFinanciero  Boolean?
+  /// Tiene pagos de matrícula pendientes
+  moraMatricula    Boolean?
+  /// Puntaje global Saber 11 (0-500)
+  puntajeSaber11   Int?
+  edad             Int?
+  /// ACTIVO, o el resultado conocido (RETIRADO / GRADUADO) que sirve para entrenar el modelo
+  estado           EstadoEstudiante @default(ACTIVO)
+  /// Periodo al que corresponden los datos (p. ej. 2026-2)
+  periodo          String?
+  cargaId          String?
+  carga            Carga?           @relation(fields: [cargaId], references: [id], onDelete: SetNull)
+  evaluacion       Evaluacion?
+  creadoEn         DateTime         @default(now())
+  actualizadoEn    DateTime         @updatedAt
 
-  usuario        Usuario?
-  matriculas     Matricula[]
-  notas          NotaSemestre[]
-  financiaciones Financiacion[]
-  retiro         Retiro?
-  encuestas      Encuesta[]
-  puntajes       PuntajeRiesgo[]
-  alertas        Alerta[]
-  intervenciones Intervencion[]
-  inscripciones  Inscripcion[]
-
-  @@index([programaId])
-  @@index([cohorte])
+  @@index([programa])
   @@index([estado])
-  @@index([municipioOrigen])
   @@map("estudiantes")
 }
 
-model Matricula {
-  id             String     @id @default(uuid())
-  estudianteId   String
-  estudiante     Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  periodoId      String
-  periodo        Periodo    @relation(fields: [periodoId], references: [id])
-  /// Número de semestre académico cursado (1, 2, 3...)
-  semestre       Int
-  valorMatricula Int
-
-  @@unique([estudianteId, periodoId])
-  @@index([periodoId])
-  @@map("matriculas")
-}
-
-model NotaSemestre {
-  id                String     @id @default(uuid())
-  estudianteId      String
-  estudiante        Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  periodoId         String
-  periodo           Periodo    @relation(fields: [periodoId], references: [id])
-  semestre          Int
-  promedio          Float // escala 0.0 - 5.0
-  materiasInscritas Int
-  materiasPerdidas  Int
-  asistenciaPct     Float // 0 - 100
-
-  @@unique([estudianteId, periodoId])
-  @@index([periodoId])
-  @@map("notas_semestre")
-}
-
-model Financiacion {
-  id                 String           @id @default(uuid())
-  estudianteId       String
-  estudiante         Estudiante       @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  tipo               TipoFinanciacion
-  /// Porción de la matrícula cubierta por esta fuente (0-100)
-  porcentajeCubierto Int
-  /// Total financiado a lo largo de la carrera (COP)
-  montoTotal         Int
-  /// Deuda vigente (ICETEX / crédito UCC). 0 para becas y recursos propios
-  saldoPendiente     Int              @default(0)
-  /// Tasa efectiva anual de la deuda (ej. 0.11 = 11%)
-  tasaEA             Float            @default(0)
-  plazoMeses         Int              @default(0)
-
-  @@index([estudianteId])
-  @@index([tipo])
-  @@map("financiacion")
-}
-
-model CausaDesercion {
-  id          String         @id @default(uuid())
-  nombre      String         @unique
-  categoria   CategoriaCausa
-  descripcion String?
-  retiros     Retiro[]
-
-  @@map("causas_desercion")
-}
-
-model Retiro {
-  id             String         @id @default(uuid())
-  estudianteId   String         @unique
-  estudiante     Estudiante     @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  periodoId      String
-  periodo        Periodo        @relation(fields: [periodoId], references: [id])
-  /// Último semestre cursado antes de retirarse
-  semestreRetiro Int
-  fechaRetiro    DateTime
-  causaId        String
-  causa          CausaDesercion @relation(fields: [causaId], references: [id])
-  observacion    String?
-
-  @@index([periodoId])
-  @@index([causaId])
-  @@map("retiros")
-}
-
-// ---------------------------------------------------------------------
-// Encuestas, riesgo, alertas e intervenciones (se usan desde la Fase 2)
-// ---------------------------------------------------------------------
-
-model Encuesta {
-  id                String              @id @default(uuid())
-  estudianteId      String
-  estudiante        Estudiante          @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  fecha             DateTime            @default(now())
-  /// Consentimiento informado antes de responder (Ley 1581/2012)
-  consentimiento    Boolean
-  /// Autoriza que Bienestar lo contacte si el resultado es de riesgo alto
-  autorizaContacto  Boolean             @default(false)
-  puntaje           Int?
-  nivel             NivelRiesgo?
-  /// Puntaje 0-100 por dimensión (económica, académica, motivación, entorno)
-  puntajesDimension Json?
-  respuestas        RespuestaEncuesta[]
-
-  @@index([estudianteId])
-  @@map("encuestas")
-}
-
-model RespuestaEncuesta {
-  id         String            @id @default(uuid())
-  encuestaId String
-  encuesta   Encuesta          @relation(fields: [encuestaId], references: [id], onDelete: Cascade)
-  clave      String // identificador de la pregunta
-  dimension  DimensionEncuesta
-  valor      Int // escala Likert 1-5
-  texto      String?
-
-  @@index([encuestaId])
-  @@map("respuestas_encuesta")
-}
-
-model PuntajeRiesgo {
+/// Riesgo calculado para un estudiante y su explicación
+model Evaluacion {
   id            String      @id @default(uuid())
-  estudianteId  String
+  estudianteId  String      @unique
   estudiante    Estudiante  @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  periodoId     String?
-  periodo       Periodo?    @relation(fields: [periodoId], references: [id])
-  puntaje       Int // 0-100
+  /// 0-100
+  puntaje       Int
   nivel         NivelRiesgo
-  /// Aporte de cada factor al puntaje (explicabilidad)
+  /// "FACTORES" (puntaje por factores documentados) o "MODELO" (regresión logística entrenada con datos de la UCC)
+  metodo        String
+  /// Versión del modelo cuando metodo = MODELO
+  modeloVersion String?
+  /// Factores que suman al riesgo: [{ clave, etiqueta, puntos, detalle }]
   factores      Json
-  modeloVersion String
+  /// Datos que no venían en el archivo y no se pudieron evaluar
+  faltantes     String[]
   calculadoEn   DateTime    @default(now())
+  /// Explicación redactada por el agente de IA (se genera a pedido y se guarda)
+  explicacion   String?
+  explicadaEn   DateTime?
+  modeloIa      String?
 
-  @@index([estudianteId])
   @@index([nivel])
-  @@map("puntajes_riesgo")
+  @@map("evaluaciones")
 }
 
-model Alerta {
-  id             String         @id @default(uuid())
-  estudianteId   String
-  estudiante     Estudiante     @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  creadaPorId    String?
-  creadaPor      Usuario?       @relation(fields: [creadaPorId], references: [id])
-  /// Curso desde el que un docente reportó la alerta (opcional)
-  cursoId        String?
-  curso          Curso?         @relation(fields: [cursoId], references: [id], onDelete: SetNull)
-  origen         OrigenAlerta
-  motivo         String
-  estado         EstadoAlerta   @default(ABIERTA)
-  creadaEn       DateTime       @default(now())
-  actualizadaEn  DateTime       @updatedAt
-  intervenciones Intervencion[]
-
-  @@index([estudianteId])
-  @@index([estado])
-  @@map("alertas")
-}
-
-model Intervencion {
-  id            String             @id @default(uuid())
-  estudianteId  String
-  estudiante    Estudiante         @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  responsableId String
-  responsable   Usuario            @relation(fields: [responsableId], references: [id])
-  tipo          TipoIntervencion
-  fecha         DateTime           @default(now())
-  descripcion   String
-  montoApoyo    Int?
-  estado        EstadoIntervencion @default(EN_CURSO)
-  /// Periodo académico en que se hizo (permite medir si el estudiante permaneció después)
-  periodoId     String?
-  periodo       Periodo?           @relation(fields: [periodoId], references: [id], onDelete: SetNull)
-  /// Alerta que originó la intervención (opcional)
-  alertaId      String?
-  alerta        Alerta?            @relation(fields: [alertaId], references: [id], onDelete: SetNull)
-  /// Observación al cerrar la intervención
-  resultado     String?
-
-  @@index([estudianteId])
-  @@index([tipo])
-  @@index([periodoId])
-  @@map("intervenciones")
-}
-
-// ---------------------------------------------------------------------
-// Parámetros editables por el ADMIN (salarios OLE, costos, SPADIES, escenarios)
-// ---------------------------------------------------------------------
-
-model ParametroEconomico {
-  id               String             @id @default(uuid())
-  categoria        CategoriaParametro
-  clave            String
-  nombre           String
-  valor            Float
-  unidad           String // COP, %, años, factor...
-  descripcion      String?
-  fuente           String?
-  /// Si es NULL aplica a toda la universidad; si no, solo a ese programa
-  programaId       String?
-  programa         Programa?          @relation(fields: [programaId], references: [id], onDelete: Cascade)
-  actualizadoEn    DateTime           @updatedAt
-  actualizadoPorId String?
-  actualizadoPor   Usuario?           @relation(fields: [actualizadoPorId], references: [id])
-
-  @@unique([clave, programaId])
-  @@index([categoria])
-  @@map("parametros_economicos")
-}
-
-// ---------------------------------------------------------------------
-// Fase 2: cursos del periodo (panel docente) y versiones del modelo de riesgo
-// ---------------------------------------------------------------------
-
-model Curso {
-  id         String   @id @default(uuid())
-  codigo     String // "SIS-301"
-  nombre     String
-  /// Semestre del plan de estudios al que pertenece
-  semestre   Int
-  creditos   Int      @default(3)
-  programaId String
-  programa   Programa @relation(fields: [programaId], references: [id])
-  periodoId  String
-  periodo    Periodo  @relation(fields: [periodoId], references: [id])
-  docenteId  String
-  docente    Usuario  @relation(fields: [docenteId], references: [id])
-
-  inscripciones Inscripcion[]
-  alertas       Alerta[]
-
-  @@unique([codigo, periodoId])
-  @@index([docenteId])
-  @@index([periodoId])
-  @@map("cursos")
-}
-
-model Inscripcion {
-  id            String     @id @default(uuid())
-  cursoId       String
-  curso         Curso      @relation(fields: [cursoId], references: [id], onDelete: Cascade)
-  estudianteId  String
-  estudiante    Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
-  /// Nota acumulada del corte en curso (0.0 - 5.0); null si aún no hay calificaciones
-  notaParcial   Float?
-  asistenciaPct Float
-  fallas        Int        @default(0)
-
-  @@unique([cursoId, estudianteId])
-  @@index([estudianteId])
-  @@map("inscripciones")
-}
-
+/// Versiones del modelo estadístico entrenado con estudiantes reales que ya tienen resultado
 model ModeloRiesgo {
-  id             String   @id @default(uuid())
-  version        String   @unique
-  /// PYTHON_SKLEARN (script de ml/) o ENTRENAMIENTO_ADMIN (reentrenado desde el panel)
-  origen         String
+  id         String   @id @default(uuid())
+  version    String   @unique
   /// Características, medias, desviaciones, coeficientes, intercepto y umbrales
-  definicion     Json
-  /// AUC, Brier, tasa base, matriz de confusión, etc.
-  metricas       Json
-  activo         Boolean  @default(false)
-  creadoEn       DateTime @default(now())
-  entrenadoPorId String?
-  entrenadoPor   Usuario? @relation(fields: [entrenadoPorId], references: [id])
+  definicion Json
+  /// AUC, Brier, tamaño de muestra, etc. (evaluado con estudiantes que no se usaron para entrenar)
+  metricas   Json
+  activo     Boolean  @default(false)
+  creadoEn   DateTime @default(now())
 
   @@index([activo])
   @@map("modelos_riesgo")
-}
-
-// ---------------------------------------------------------------------
-// Fase 3: trazabilidad de importaciones CSV y auditoría de accesos
-// ---------------------------------------------------------------------
-
-/// Cada carga de un archivo CSV de estudiantes (quién, cuándo y qué cambió)
-model Importacion {
-  id                      String   @id @default(uuid())
-  archivo                 String
-  filas                   Int
-  estudiantesNuevos       Int
-  estudiantesActualizados Int
-  semestres               Int
-  usuarioId               String
-  usuario                 Usuario  @relation(fields: [usuarioId], references: [id])
-  creadaEn                DateTime @default(now())
-
-  @@index([creadaEn])
-  @@map("importaciones")
-}
-
-/// Registro persistente de accesos a datos personales (Ley 1581 de 2012)
-model AuditoriaAcceso {
-  id        String   @id @default(uuid())
-  usuarioId String
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  rol       String
-  /// CONSULTA_FICHA, CONSULTA_CALCULADORA, EXPORTACION, IMPORTACION, LOGIN_BLOQUEADO...
-  accion    String
-  /// Identificador anónimo del estudiante o nombre del recurso (nunca nombres ni documentos)
-  recurso   String
-  detalle   String?
-  creadoEn  DateTime @default(now())
-
-  @@index([creadoEn])
-  @@index([usuarioId])
-  @@map("auditoria_accesos")
 }
