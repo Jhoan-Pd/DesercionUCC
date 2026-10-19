@@ -21,7 +21,8 @@
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "ml:dataset": "tsx ml/exportar_dataset.ts",
-    "ml:entrenar": "python ml/entrenar_modelo.py"
+    "ml:entrenar": "python ml/entrenar_modelo.py",
+    "datos:actualizar": "tsx scripts/actualizar-datos-abiertos.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
