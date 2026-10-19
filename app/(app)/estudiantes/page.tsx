@@ -54,7 +54,10 @@ export default async function EstudiantesPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <Encabezado titulo="Estudiantes en riesgo" descripcion="Estudiantes activos ordenados del mayor al menor riesgo. Abre la ficha para ver los factores y la explicación del agente." />
+      <Encabezado
+        titulo="Estudiantes en riesgo"
+        descripcion="Estudiantes activos ordenados del mayor al menor riesgo. Abre la ficha para ver los factores y la explicación del agente."
+      />
 
       <Card>
         <CardContent className="pt-5">
@@ -127,42 +130,42 @@ export default async function EstudiantesPage({ searchParams }: { searchParams: 
             </ul>
             {/* Escritorio: tabla */}
             <div className="hidden md:block">
-            <Table>
-              <THead>
-                <TR>
-                  <TH>Estudiante</TH>
-                  <TH>Programa</TH>
-                  <TH className="text-right">Sem.</TH>
-                  <TH>Riesgo</TH>
-                  <TH>Principales factores</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {lista.filas.map((e) => (
-                  <TR key={e.codigo}>
-                    <TD>
-                      <Link href={`/estudiantes/${encodeURIComponent(e.codigo)}`} className="font-medium text-primary hover:underline">
-                        {e.nombre}
-                      </Link>
-                      <span className="block text-xs text-muted-foreground">{e.codigo}</span>
-                    </TD>
-                    <TD>{e.programa}</TD>
-                    <TD className="text-right tabular-nums">{e.semestre}</TD>
-                    <TD>
-                      {e.nivel && e.puntaje !== null ? (
-                        <div className="flex flex-col gap-1">
-                          <NivelBadge nivel={e.nivel} className="w-fit" />
-                          <BarraPuntaje puntaje={e.puntaje} nivel={e.nivel} />
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Sin evaluar</span>
-                      )}
-                    </TD>
-                    <TD className="text-sm text-muted-foreground">{e.factores.length ? e.factores.slice(0, 2).join(" · ") : "Ninguno"}</TD>
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>Estudiante</TH>
+                    <TH>Programa</TH>
+                    <TH className="text-right">Sem.</TH>
+                    <TH>Riesgo</TH>
+                    <TH>Principales factores</TH>
                   </TR>
-                ))}
-              </TBody>
-            </Table>
+                </THead>
+                <TBody>
+                  {lista.filas.map((e) => (
+                    <TR key={e.codigo}>
+                      <TD>
+                        <Link href={`/estudiantes/${encodeURIComponent(e.codigo)}`} className="font-medium text-primary hover:underline">
+                          {e.nombre}
+                        </Link>
+                        <span className="block text-xs text-muted-foreground">{e.codigo}</span>
+                      </TD>
+                      <TD>{e.programa}</TD>
+                      <TD className="text-right tabular-nums">{e.semestre}</TD>
+                      <TD>
+                        {e.nivel && e.puntaje !== null ? (
+                          <div className="flex flex-col gap-1">
+                            <NivelBadge nivel={e.nivel} className="w-fit" />
+                            <BarraPuntaje puntaje={e.puntaje} nivel={e.nivel} />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Sin evaluar</span>
+                        )}
+                      </TD>
+                      <TD className="text-sm text-muted-foreground">{e.factores.length ? e.factores.slice(0, 2).join(" · ") : "Ninguno"}</TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
             </div>
             <Paginacion pagina={lista.pagina} paginas={lista.paginas} total={lista.total} base="/estudiantes" params={params} />
           </CardContent>
