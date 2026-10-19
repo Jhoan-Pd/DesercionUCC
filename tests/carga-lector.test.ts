@@ -77,7 +77,7 @@ describe("Excel", () => {
   it("la plantilla trae las columnas en orden y se puede leer de vuelta", async () => {
     const buffer = await plantillaExcel();
     const libro = new ExcelJS.Workbook();
-    await libro.xlsx.load(buffer);
+    await libro.xlsx.load(buffer as unknown as ArrayBuffer);
     const hoja = libro.getWorksheet("Estudiantes")!;
     hoja.addRow(["B7", "Carlos Ruiz", "Ingeniería Industrial", 4, 2.9, 2, 78, 1, true, false, true, 240, 23, "activo", "2026-2"]);
     const tabla = await leerExcel(await libro.xlsx.writeBuffer() as ArrayBuffer);

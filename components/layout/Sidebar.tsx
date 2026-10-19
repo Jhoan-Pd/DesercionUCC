@@ -8,7 +8,6 @@ import { GraduationCap, LogOut, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ETIQUETA_ROL, type Rol } from "@/lib/roles";
 import type { Modulo } from "@/lib/modulos";
-import { FASE_ACTUAL } from "@/lib/modulos";
 import { IconoModulo } from "./Iconos";
 
 interface Props {
@@ -36,7 +35,6 @@ export function Sidebar({ modulos, usuario }: Props) {
       <nav aria-label="Módulos" className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
         {modulos.map((m) => {
           const activo = pathname === m.href || pathname.startsWith(`${m.href}/`);
-          const proximamente = m.fase > FASE_ACTUAL;
           return (
             <Link
               key={m.href}
@@ -46,12 +44,10 @@ export function Sidebar({ modulos, usuario }: Props) {
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors",
                 activo ? "bg-white/15 font-semibold" : "text-white/85 hover:bg-white/10",
-                proximamente && "opacity-60",
               )}
             >
               <IconoModulo icono={m.icono} className="h-4 w-4 shrink-0" />
               <span className="flex-1">{m.titulo}</span>
-              {proximamente && <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase">Fase {m.fase}</span>}
             </Link>
           );
         })}

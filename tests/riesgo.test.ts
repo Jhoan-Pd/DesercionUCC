@@ -80,6 +80,11 @@ describe("Modelo entrenado con estudiantes que ya tienen resultado", () => {
     expect(alto.metodo).toBe("MODELO");
     expect(alto.factores[0].clave).toBe("promedio");
     expect(alto.factores.every((f) => f.puntos >= 1)).toBe(true);
+    // Los puntos reparten el riesgo por encima del estudiante promedio (salvo redondeo)
+    const promedio = Math.round(100 / (1 + Math.exp(-r.definicion.intercepto)));
+    const suma = alto.factores.reduce((s, f) => s + f.puntos, 0);
+    expect(Math.abs(suma - (alto.puntaje - promedio))).toBeLessThanOrEqual(alto.factores.length);
+    expect(alto.factores[0].detalle).toMatch(/frente a .* en promedio en la UCC/);
   });
 
   it("no usa variables que casi nadie trae ni constantes", () => {

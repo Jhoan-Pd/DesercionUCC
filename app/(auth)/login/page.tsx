@@ -24,7 +24,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { call
         <div className="space-y-4">
           <h1 className="text-4xl font-bold leading-tight">Observatorio de Deserción</h1>
           <p className="max-w-md text-lg text-white/85">
-            Mide el impacto de desertar, detecta a tiempo a los estudiantes en riesgo y evalúa si las intervenciones funcionan.
+            Detecta a tiempo a los estudiantes que podrían retirarse, con datos reales de la universidad y un agente de IA que explica cada caso a Bienestar.
           </p>
           <div className="h-1 w-24 rounded bg-ucc-verde" />
         </div>

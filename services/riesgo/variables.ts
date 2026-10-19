@@ -18,6 +18,9 @@ export interface DatosEstudiante {
 
 export type ClaveVariable = keyof DatosEstudiante;
 
+/** Lista de claves (para validar con Zod las variables de un modelo guardado) */
+export const CLAVES_VARIABLES = ["semestre", "promedio", "materiasPerdidas", "asistencia", "estrato", "trabaja", "apoyoFinanciero", "moraMatricula", "puntajeSaber11", "edad"] as const satisfies readonly ClaveVariable[];
+
 export interface DefinicionVariable {
   clave: ClaveVariable;
   etiqueta: string;
