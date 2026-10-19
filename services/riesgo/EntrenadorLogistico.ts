@@ -1,5 +1,3 @@
-import type { DefinicionModelo } from "./ModeloRiesgo";
-
 /**
  * Regresión logística con regularización L2, equivalente a
  *   sklearn.linear_model.LogisticRegression(penalty="l2", C=1.0) sobre datos con StandardScaler.
@@ -8,7 +6,7 @@ import type { DefinicionModelo } from "./ModeloRiesgo";
  *
  * Se resuelve con el método de Newton-Raphson (IRLS): con ~20 variables la matriz hessiana es
  * pequeña y converge en pocas iteraciones con precisión de máquina. Permite REENTRENAR el modelo
- * desde el panel de administración sin un servidor Python en producción.
+ * con los datos de la UCC directamente en el servidor (sin Python en producción).
  */
 export interface OpcionesEntrenamiento {
   C?: number;
@@ -128,25 +126,5 @@ export class EntrenadorLogistico {
     const medio = Math.round(tasaBase * 100) / 100;
     const alto = Math.min(0.9, Math.round(tasaBase * 2.5 * 100) / 100);
     return { medio, alto: Math.max(alto, medio + 0.01) };
-  }
-
-  /** Arma la definición del modelo lista para ModeloRiesgo */
-  static definicion(
-    ajuste: ResultadoAjuste,
-    caracteristicas: string[],
-    y: number[],
-    meta: { version: string; origen: string; horizonteSemestres: number },
-  ): DefinicionModelo {
-    const tasaBase = y.reduce((a, b) => a + b, 0) / y.length;
-    return {
-      ...meta,
-      caracteristicas,
-      medias: ajuste.medias,
-      desviaciones: ajuste.desviaciones,
-      coeficientes: ajuste.coeficientes,
-      intercepto: ajuste.intercepto,
-      tasaBase,
-      umbrales: EntrenadorLogistico.umbrales(tasaBase),
-    };
   }
 }
