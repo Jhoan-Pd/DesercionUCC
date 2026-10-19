@@ -11,14 +11,13 @@ import { esRol, type Rol } from "@/lib/roles";
 export interface CuentaActual {
   activo: boolean;
   rol: string;
-  estudianteId: string | null;
 }
 
-export type ResultadoRevalidacion = { valida: false; motivo: "inexistente" | "inactiva" | "rol-invalido" } | { valida: true; rol: Rol; estudianteId: string | null };
+export type ResultadoRevalidacion = { valida: false; motivo: "inexistente" | "inactiva" | "rol-invalido" } | { valida: true; rol: Rol };
 
 export function revalidarSesion(cuenta: CuentaActual | null): ResultadoRevalidacion {
   if (!cuenta) return { valida: false, motivo: "inexistente" };
   if (!cuenta.activo) return { valida: false, motivo: "inactiva" };
   if (!esRol(cuenta.rol)) return { valida: false, motivo: "rol-invalido" };
-  return { valida: true, rol: cuenta.rol, estudianteId: cuenta.estudianteId };
+  return { valida: true, rol: cuenta.rol };
 }

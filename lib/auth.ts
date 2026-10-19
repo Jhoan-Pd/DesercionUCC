@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma";
 import { esRol } from "@/lib/roles";
 import { ERROR_CUENTA_BLOQUEADA, ESTADO_LIMPIO, consultarBloqueo, registrarFallo } from "@/lib/seguridad/bloqueo";
 import { revalidarSesion } from "@/lib/seguridad/sesion";
-import { ServicioAuditoria } from "@/services/auditoria/ServicioAuditoria";
 
 const credencialesSchema = z.object({
   email: z.string().email(),
@@ -36,7 +35,6 @@ export const authOptions: NextAuthOptions = {
 
         const usuario = await prisma.usuario.findUnique({
           where: { email: parsed.data.email.toLowerCase().trim() },
-          include: { rol: true },
         });
         // Mismo resultado para correo inexistente o cuenta inactiva: no se revela qué cuentas existen
         if (!usuario || !usuario.activo) return null;
@@ -45,13 +43,10 @@ export const authOptions: NextAuthOptions = {
         if (consultarBloqueo(usuario).bloqueado) throw new Error(ERROR_CUENTA_BLOQUEADA);
 
         const coincide = await bcrypt.compare(parsed.data.password, usuario.passwordHash);
-        if (!coincide || !esRol(usuario.rol.nombre)) {
+        if (!coincide || !esRol(usuario.rol)) {
           const nuevo = registrarFallo(usuario);
           await prisma.usuario.update({ where: { id: usuario.id }, data: nuevo });
-          if (nuevo.bloqueadoHasta) {
-            await new ServicioAuditoria().registrar({ usuarioId: usuario.id, rol: usuario.rol.nombre, accion: "LOGIN_BLOQUEADO", recurso: "cuenta", detalle: `${nuevo.intentosFallidos} intentos fallidos seguidos` });
-            throw new Error(ERROR_CUENTA_BLOQUEADA);
-          }
+          if (nuevo.bloqueadoHasta) throw new Error(ERROR_CUENTA_BLOQUEADA);
           return null;
         }
 
@@ -61,8 +56,7 @@ export const authOptions: NextAuthOptions = {
           id: usuario.id,
           name: usuario.nombre,
           email: usuario.email,
-          rol: usuario.rol.nombre,
-          estudianteId: usuario.estudianteId,
+          rol: usuario.rol,
         };
       },
     }),
@@ -72,7 +66,6 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.uid = user.id;
         token.rol = user.rol;
-        token.estudianteId = user.estudianteId;
         token.revocada = false;
         return token;
       }
@@ -81,16 +74,15 @@ export const authOptions: NextAuthOptions = {
       // surte efecto de inmediato, sin esperar a que el JWT expire (ver lib/seguridad/sesion.ts)
       const cuenta = await prisma.usuario.findUnique({
         where: { id: token.uid },
-        select: { activo: true, estudianteId: true, rol: { select: { nombre: true } } },
+        select: { activo: true, rol: true },
       });
-      const r = revalidarSesion(cuenta ? { activo: cuenta.activo, rol: cuenta.rol.nombre, estudianteId: cuenta.estudianteId } : null);
+      const r = revalidarSesion(cuenta);
       if (!r.valida) return { ...token, revocada: true };
-      return { ...token, rol: r.rol, estudianteId: r.estudianteId, revocada: false };
+      return { ...token, rol: r.rol, revocada: false };
     },
     async session({ session, token }) {
       session.user.id = token.uid;
       session.user.rol = token.rol;
-      session.user.estudianteId = token.estudianteId;
       session.revocada = token.revocada === true;
       return session;
     },
