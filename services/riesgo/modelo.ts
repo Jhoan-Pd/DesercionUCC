@@ -2,7 +2,7 @@ import { z } from "zod";
 import { EntrenadorLogistico } from "./EntrenadorLogistico";
 import { calcularMetricas, esDePrueba } from "./metricas";
 import type { FactorRiesgo, NivelRiesgo, ResultadoRiesgo } from "./factores";
-import { VARIABLES, describirValor, tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
+import { CLAVES_VARIABLES, VARIABLES, describirValor, tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
 
 /**
  * MODELO ESTADÍSTICO entrenado con estudiantes REALES de la UCC que ya tienen resultado conocido
@@ -27,7 +27,7 @@ export interface RegistroConResultado {
 
 export const definicionModeloSchema = z.object({
   version: z.string().min(1),
-  variables: z.array(z.string()).min(1),
+  variables: z.array(z.enum(CLAVES_VARIABLES)).min(1),
   medias: z.array(z.number()),
   desviaciones: z.array(z.number()),
   coeficientes: z.array(z.number()),
@@ -35,7 +35,7 @@ export const definicionModeloSchema = z.object({
   tasaBase: z.number().min(0).max(1),
   umbrales: z.object({ medio: z.number(), alto: z.number() }),
 });
-export type DefinicionModelo = z.infer<typeof definicionModeloSchema> & { variables: ClaveVariable[] };
+export type DefinicionModelo = z.infer<typeof definicionModeloSchema>;
 
 export interface MetricasEntrenamiento {
   estudiantes: number;
@@ -85,7 +85,7 @@ function mediasDe(registros: RegistroConResultado[], variables: ClaveVariable[])
 function ajustar(registros: RegistroConResultado[], variables: ClaveVariable[], version: string) {
   const imputacion = mediasDe(registros, variables);
   const X = registros.map((r) => vectorizar(r.datos, variables, imputacion));
-  const y = registros.map((r) => (r.retirado ? 1 : 0));
+  const y: number[] = registros.map((r) => (r.retirado ? 1 : 0));
   const ajuste = new EntrenadorLogistico({ C: 1 }).ajustar(X, y);
   const tasaBase = y.reduce((a, b) => a + b, 0) / y.length;
   const definicion: DefinicionModelo = {
@@ -185,7 +185,7 @@ export function predecirConModelo(def: DefinicionModelo, d: DatosEstudiante): Re
   const logit = Math.log(p / (1 - p));
   const faltantes = def.variables.filter((v) => !tieneValor(d[v]));
   const factores: FactorRiesgo[] = def.variables
-    .map((clave, i) => {
+    .map((clave, i): FactorRiesgo | null => {
       if (!tieneValor(d[clave]) || aportes[i] <= 0) return null;
       const puntos = Math.round(100 * (p - sigmoide(logit - aportes[i])));
       if (puntos < 1) return null;
