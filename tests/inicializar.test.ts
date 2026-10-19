@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { debeSembrar } from "../prisma/inicializar";
+import { CORREO_ADMIN_POR_DEFECTO, cuentaInicial } from "../prisma/cuenta-inicial";
 
-describe("inicialización en el despliegue", () => {
-  it("siembra solo cuando la base está vacía", () => {
-    expect(debeSembrar(0, undefined)).toBe(true);
-    expect(debeSembrar(14, undefined)).toBe(false);
+describe("cuenta del primer administrador", () => {
+  it("no tiene contraseña por defecto: sin variable de entorno no se crea", () => {
+    expect(() => cuentaInicial({})).toThrow(/SEED_ADMIN_PASSWORD/);
   });
 
-  it("FORZAR_SEED=1 permite recargar a propósito", () => {
-    expect(debeSembrar(14, "1")).toBe(true);
-    expect(debeSembrar(14, "true")).toBe(false);
+  it("exige una contraseña de al menos 8 caracteres con letras y números", () => {
+    expect(() => cuentaInicial({ SEED_ADMIN_PASSWORD: "corta1" })).toThrow();
+    expect(() => cuentaInicial({ SEED_ADMIN_PASSWORD: "solamenteletras" })).toThrow();
+    expect(cuentaInicial({ SEED_ADMIN_PASSWORD: "Pasto2026x" }).email).toBe(CORREO_ADMIN_POR_DEFECTO);
+  });
+
+  it("acepta SEED_DEMO_PASSWORD de los despliegues anteriores y un correo propio", () => {
+    const c = cuentaInicial({ SEED_DEMO_PASSWORD: "Clave2026", SEED_ADMIN_EMAIL: " Jhoan.Paredes@CampusUCC.edu.co " });
+    expect(c).toEqual({ email: "jhoan.paredes@campusucc.edu.co", password: "Clave2026" });
+    expect(() => cuentaInicial({ SEED_ADMIN_PASSWORD: "Clave2026", SEED_ADMIN_EMAIL: "no-es-correo" })).toThrow();
   });
 });
