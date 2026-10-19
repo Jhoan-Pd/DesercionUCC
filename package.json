@@ -1,8 +1,8 @@
 {
   "name": "observatorio-desercion-ucc",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
-  "description": "Observatorio de Deserción UCC - mide el impacto de desertar y detecta estudiantes en riesgo",
+  "description": "Observatorio de Deserción UCC - detecta a tiempo a los estudiantes que podrían retirarse, con datos reales y un agente de IA (Gemini)",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -20,8 +20,6 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
-    "ml:dataset": "tsx ml/exportar_dataset.ts",
-    "ml:entrenar": "python ml/entrenar_modelo.py",
     "datos:actualizar": "tsx scripts/actualizar-datos-abiertos.ts"
   },
   "prisma": {
@@ -34,8 +32,6 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "exceljs": "^4.4.0",
-    "jspdf": "^3.0.4",
-    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.453.0",
     "next": "^14.2.0",
     "next-auth": "^4.24.7",
@@ -47,7 +43,6 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@faker-js/faker": "^8.4.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.16.0",
     "@types/react": "^18.3.0",
