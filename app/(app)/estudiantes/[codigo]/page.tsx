@@ -56,7 +56,7 @@ export default async function FichaPage({ params }: { params: { codigo: string }
                 <CardTitle>¿Por qué este nivel de riesgo?</CardTitle>
                 <CardDescription>
                   {ev.metodo === "MODELO"
-                    ? `Modelo entrenado con estudiantes de la UCC (${ev.modeloVersion}). Los puntos son lo que cada dato aumenta la probabilidad frente a un estudiante promedio.`
+                    ? `Modelo entrenado con estudiantes de la UCC (${ev.modeloVersion}). Los puntos reparten el riesgo que tiene por encima de un estudiante promedio según lo que pesa cada dato.`
                     : "Puntaje por factores de riesgo (0 a 100). Cada factor suma los puntos indicados."}
                 </CardDescription>
               </CardHeader>

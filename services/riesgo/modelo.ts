@@ -2,7 +2,7 @@ import { z } from "zod";
 import { EntrenadorLogistico } from "./EntrenadorLogistico";
 import { calcularMetricas, esDePrueba } from "./metricas";
 import type { FactorRiesgo, NivelRiesgo, ResultadoRiesgo } from "./factores";
-import { CLAVES_VARIABLES, VARIABLES, describirValor, tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
+import { CLAVES_VARIABLES, VARIABLES, tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
 
 /**
  * MODELO ESTADÍSTICO entrenado con estudiantes REALES de la UCC que ya tienen resultado conocido
@@ -176,27 +176,33 @@ function nivelModelo(def: DefinicionModelo, p: number): NivelRiesgo {
 }
 
 /**
- * Riesgo con el modelo. El puntaje es la probabilidad estimada (0-100). Cada factor muestra cuántos
- * puntos de probabilidad aporta: la diferencia entre el riesgo del estudiante y el que tendría si ese
- * dato fuera el promedio de la UCC.
+ * Riesgo con el modelo. El puntaje es la probabilidad estimada (0-100).
+ * Los puntos de cada factor reparten el riesgo que el estudiante tiene POR ENCIMA de un estudiante
+ * promedio de la UCC, en proporción a lo que cada dato aporta al modelo (así suman exactamente ese
+ * exceso y no se "aplastan" cuando la probabilidad es muy alta). Si el riesgo está por debajo del
+ * promedio, cada factor muestra cuánto subiría el riesgo frente al promedio en ese dato.
  */
 export function predecirConModelo(def: DefinicionModelo, d: DatosEstudiante): ResultadoRiesgo {
   const { p, aportes } = probabilidad(def, d);
   const logit = Math.log(p / (1 - p));
+  const pPromedio = sigmoide(def.intercepto);
   const faltantes = def.variables.filter((v) => !tieneValor(d[v]));
+  const positivos = def.variables.map((v, i) => (tieneValor(d[v]) && aportes[i] > 0 ? aportes[i] : 0));
+  const sumaPositivos = positivos.reduce((a, b) => a + b, 0);
+  const exceso = p - pPromedio;
+
   const factores: FactorRiesgo[] = def.variables
     .map((clave, i): FactorRiesgo | null => {
-      if (!tieneValor(d[clave]) || aportes[i] <= 0) return null;
-      const puntos = Math.round(100 * (p - sigmoide(logit - aportes[i])));
+      if (positivos[i] <= 0) return null;
+      const puntos = Math.round(100 * (exceso > 0 ? (exceso * positivos[i]) / sumaPositivos : p - sigmoide(logit - aportes[i])));
       if (puntos < 1) return null;
       const valor = d[clave] as number | boolean;
-      const promedio = typeof valor === "boolean" ? `${Math.round(def.medias[i] * 100)} % de los estudiantes` : def.medias[i].toLocaleString("es-CO", { maximumFractionDigits: 1 });
-      return {
-        clave,
-        etiqueta: describirValor(clave, valor).split(":")[0],
-        puntos,
-        detalle: `${describirValor(clave, valor)} (referencia en la UCC: ${promedio}).`,
-      };
+      const def_ = VARIABLES.find((v) => v.clave === clave)!;
+      const detalle =
+        typeof valor === "boolean"
+          ? `${def_.formato(valor)}; en la UCC lo tiene el ${Math.round(def.medias[i] * 100)} % de los estudiantes con resultado conocido.`
+          : `${def_.formato(valor)} frente a ${def_.formato(def.medias[i])} en promedio en la UCC.`;
+      return { clave, etiqueta: def_.etiqueta, puntos, detalle };
     })
     .filter((f): f is FactorRiesgo => f !== null)
     .sort((a, b) => b.puntos - a.puntos);

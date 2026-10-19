@@ -52,7 +52,7 @@ export function explicacionBasica(e: EntradaExplicacion): string {
     lineas.push(`Riesgo ${NIVEL_TEXTO[e.nivel]} (${e.puntaje}/100) según ${metodo}: con los datos disponibles no aparece ningún factor de alerta.`);
   } else {
     lineas.push(`Riesgo ${NIVEL_TEXTO[e.nivel]} (${e.puntaje}/100) según ${metodo}. Lo que más pesa:`);
-    for (const f of e.factores.slice(0, 4)) lineas.push(`• ${f.detalle}`);
+    for (const f of e.factores.slice(0, 4)) lineas.push(`• ${e.metodo === "MODELO" ? `${f.etiqueta}: ${f.detalle}` : f.detalle}`);
   }
   const acciones = accionesSugeridas(e.factores);
   if (acciones.length > 0) {
