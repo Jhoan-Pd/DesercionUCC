@@ -63,7 +63,7 @@ export default async function InicioPage() {
         </Link>
       </Encabezado>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 [&>*]:min-w-0 sm:grid-cols-2 xl:grid-cols-4">
         <Indicador etiqueta="Estudiantes activos" valor={n(r.activos)} icono={<Users className="h-4 w-4" aria-hidden />} nota={r.ultimaCarga ? `Última carga: ${new Date(r.ultimaCarga.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })}` : undefined} />
         <Indicador etiqueta="Riesgo alto" valor={n(r.nivel.ALTO)} nota={pct(r.nivel.ALTO, r.activos)} icono={<AlertOctagon className="h-4 w-4 text-red-700" aria-hidden />} />
         <Indicador etiqueta="Riesgo medio" valor={n(r.nivel.MEDIO)} nota={pct(r.nivel.MEDIO, r.activos)} icono={<AlertTriangle className="h-4 w-4 text-amber-700" aria-hidden />} />
@@ -72,7 +72,7 @@ export default async function InicioPage() {
 
       <MetodoRiesgo modelo={r.modelo} />
 
-      <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
+      <div className="grid gap-4 [&>*]:min-w-0 xl:grid-cols-[3fr_2fr]">
         <Card>
           <CardHeader>
             <CardTitle>Riesgo por programa</CardTitle>

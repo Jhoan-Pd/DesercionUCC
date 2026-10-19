@@ -48,7 +48,7 @@ export default async function FichaPage({ params }: { params: { codigo: string }
         </Alert>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
+      <div className="grid gap-4 [&>*]:min-w-0 xl:grid-cols-[3fr_2fr]">
         <div className="space-y-4">
           {ev && (
             <Card>

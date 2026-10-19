@@ -31,7 +31,7 @@ export default async function CargarPage() {
         </a>
       </Encabezado>
 
-      <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
+      <div className="grid items-start gap-4 [&>*]:min-w-0 xl:grid-cols-[3fr_2fr]">
         <Card>
           <CardHeader>
             <CardTitle>Subir archivo</CardTitle>
