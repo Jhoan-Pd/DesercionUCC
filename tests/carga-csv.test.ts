@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { campoCSV, claveTexto, detectarSeparador, normalizarEncabezado, parsearCSV } from "@/services/importacion/csv";
+import { campoCSV, claveTexto, detectarSeparador, normalizarEncabezado, parsearCSV } from "@/services/carga/csv";
 
 describe("parsearCSV", () => {
   it("detecta punto y coma (Excel en español) y coma", () => {
