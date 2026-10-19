@@ -30,14 +30,14 @@ export default function CifrasUccPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 [&>*]:min-w-0 sm:grid-cols-2 xl:grid-cols-4">
         <Indicador etiqueta={`Matriculados en Pasto (${r.ultimo.anio})`} valor={n(r.ultimo.total)} nota={`${n(r.ultimo.pregrado)} en pregrado y ${n(r.ultimo.posgrado)} en posgrado`} />
         <Indicador etiqueta={`Cambio frente a ${r.primero.anio}`} valor={pct(r.variacionPasto)} nota={`${n(r.primero.total)} matriculados en ${r.primero.anio}`} />
         <Indicador etiqueta={`Cambio de toda la UCC (${r.nacional[0].anio}-${r.nacional[r.nacional.length - 1].anio})`} valor={pct(r.variacionNacional)} nota={`${n(r.nacional[r.nacional.length - 1].total)} matriculados en todas las sedes`} />
         <Indicador etiqueta={`Sede Pasto entre ${r.campus.length} sedes`} valor={`${r.posicionPasto}.ª`} nota={`por número de matriculados en ${r.anioCampus}`} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 [&>*]:min-w-0 xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Matriculados en la sede Pasto por año</CardTitle>
@@ -62,9 +62,9 @@ export default function CifrasUccPage() {
       <Card>
         <CardHeader>
           <CardTitle>Programas de la sede Pasto ({r.ultimo.anio})</CardTitle>
-          <CardDescription>Matriculados por programa y su cambio frente a {r.primero.anio} (cuando el programa ya existía)</CardDescription>
+          <CardDescription>Matriculados por programa y su cambio frente a {r.primero.anio} (— = el programa no tenía matriculados ese año)</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-6 lg:grid-cols-[3fr_2fr]">
+        <CardContent className="grid gap-6 xl:grid-cols-2 [&>*]:min-w-0">
           <GraficaBarras titulo="Matriculados por programa" unidad="matriculados" datos={pregrado.map((p) => ({ etiqueta: p.programa, valor: p.total }))} />
           <Table>
             <THead>
@@ -86,7 +86,7 @@ export default function CifrasUccPage() {
                   </TD>
                   <TD className="text-right tabular-nums">{n(p.mujeres)}</TD>
                   <TD className="text-right tabular-nums">{n(p.hombres)}</TD>
-                  <TD className="text-right tabular-nums">{p.totalInicial ? pct((p.total - p.totalInicial) / p.totalInicial) : "nuevo"}</TD>
+                  <TD className="whitespace-nowrap text-right tabular-nums">{p.totalInicial ? pct((p.total - p.totalInicial) / p.totalInicial) : "—"}</TD>
                 </TR>
               ))}
             </TBody>
