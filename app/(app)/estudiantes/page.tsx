@@ -101,6 +101,32 @@ export default async function EstudiantesPage({ searchParams }: { searchParams: 
       ) : (
         <Card>
           <CardContent className="space-y-4 pt-5">
+            {/* Móvil: tarjetas */}
+            <ul className="divide-y md:hidden">
+              {lista.filas.map((e) => (
+                <li key={e.codigo} className="py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link href={`/estudiantes/${encodeURIComponent(e.codigo)}`} className="font-medium text-primary hover:underline">
+                        {e.nombre}
+                      </Link>
+                      <p className="text-xs text-muted-foreground">
+                        {e.codigo} · {e.programa} · sem. {e.semestre}
+                      </p>
+                    </div>
+                    {e.nivel && e.puntaje !== null && (
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <NivelBadge nivel={e.nivel} />
+                        <span className="text-sm font-semibold tabular-nums">{e.puntaje}</span>
+                      </div>
+                    )}
+                  </div>
+                  {e.factores.length > 0 && <p className="mt-1 text-xs text-muted-foreground">{e.factores.slice(0, 2).join(" · ")}</p>}
+                </li>
+              ))}
+            </ul>
+            {/* Escritorio: tabla */}
+            <div className="hidden md:block">
             <Table>
               <THead>
                 <TR>
@@ -137,6 +163,7 @@ export default async function EstudiantesPage({ searchParams }: { searchParams: 
                 ))}
               </TBody>
             </Table>
+            </div>
             <Paginacion pagina={lista.pagina} paginas={lista.paginas} total={lista.total} base="/estudiantes" params={params} />
           </CardContent>
         </Card>
