@@ -1,239 +1,63 @@
 erDiagram
-    ROLES ||--o{ USUARIOS : "asigna"
-    ESTUDIANTES |o--o| USUARIOS : "cuenta de"
-    PROGRAMAS ||--o{ ESTUDIANTES : "matricula a"
-    PERIODOS ||--o{ ESTUDIANTES : "cohorte de ingreso"
-    ESTUDIANTES ||--o{ MATRICULAS : "tiene"
-    PERIODOS ||--o{ MATRICULAS : "en"
-    ESTUDIANTES ||--o{ NOTAS_SEMESTRE : "obtiene"
-    PERIODOS ||--o{ NOTAS_SEMESTRE : "en"
-    ESTUDIANTES ||--o{ FINANCIACION : "se financia con"
-    ESTUDIANTES ||--o| RETIROS : "puede tener"
-    PERIODOS ||--o{ RETIROS : "ocurre en"
-    CAUSAS_DESERCION ||--o{ RETIROS : "explica"
-    ESTUDIANTES ||--o{ ENCUESTAS : "responde"
-    ENCUESTAS ||--o{ RESPUESTAS_ENCUESTA : "contiene"
-    ESTUDIANTES ||--o{ PUNTAJES_RIESGO : "recibe"
-    PERIODOS |o--o{ PUNTAJES_RIESGO : "calculado en"
-    ESTUDIANTES ||--o{ ALERTAS : "genera"
-    USUARIOS |o--o{ ALERTAS : "reporta"
-    ESTUDIANTES ||--o{ INTERVENCIONES : "recibe"
-    USUARIOS ||--o{ INTERVENCIONES : "responsable"
-    PROGRAMAS |o--o{ PARAMETROS_ECONOMICOS : "salario propio"
-    USUARIOS |o--o{ PARAMETROS_ECONOMICOS : "última edición"
-    PROGRAMAS ||--o{ CURSOS : "ofrece"
-    PERIODOS ||--o{ CURSOS : "se dicta en"
-    USUARIOS ||--o{ CURSOS : "docente de"
-    CURSOS ||--o{ INSCRIPCIONES : "tiene"
-    ESTUDIANTES ||--o{ INSCRIPCIONES : "cursa"
-    CURSOS |o--o{ ALERTAS : "reportada desde"
-    USUARIOS |o--o{ MODELOS_RIESGO : "entrenó"
-    PERIODOS |o--o{ INTERVENCIONES : "realizada en"
-    ALERTAS |o--o{ INTERVENCIONES : "origina"
-    USUARIOS ||--o{ IMPORTACIONES : "carga"
-    USUARIOS ||--o{ AUDITORIA_ACCESOS : "deja rastro en"
+    USUARIOS ||--o{ CARGAS : "sube"
+    CARGAS |o--o{ ESTUDIANTES : "trae o actualiza"
+    ESTUDIANTES ||--o| EVALUACIONES : "tiene"
 
-    ROLES {
-        int id PK
-        string nombre UK "ADMIN, BIENESTAR, DOCENTE, ESTUDIANTE"
-        string descripcion
-    }
     USUARIOS {
         uuid id PK
         string email UK
         string nombre
-        string passwordHash "bcrypt"
-        boolean activo
-        int rolId FK
-        uuid estudianteId FK "UK, solo rol ESTUDIANTE"
-        datetime ultimoAcceso
-        int intentosFallidos "bloqueo tras 5 fallos"
+        string passwordHash
+        enum rol "ADMIN | BIENESTAR"
+        bool activo
+        int intentosFallidos
         datetime bloqueadoHasta
     }
-    PROGRAMAS {
+    CARGAS {
         uuid id PK
-        string nombre UK
-        string facultad
-        int duracionSemestres
-        int valorSemestre "COP"
-        boolean activo
-    }
-    PERIODOS {
-        uuid id PK
-        string codigo UK "2024-1"
-        int anio
-        int semestre
-        int indice UK "orden cronológico"
-        date fechaInicio
-        date fechaFin
-        boolean activo
+        string archivo
+        int filas
+        int nuevos
+        int actualizados
+        json errores
+        uuid usuarioId FK
+        datetime creadaEn
     }
     ESTUDIANTES {
         uuid id PK
         string codigo UK
-        string hashAnonimo UK "para reportes"
-        string nombres
-        string apellidos
-        enum sexo
-        int edadIngreso
-        int estrato
-        string municipioOrigen
-        string departamentoOrigen
-        boolean trabaja
-        int horasTrabajoSemana
-        uuid programaId FK
-        uuid periodoIngresoId FK
-        string cohorte
-        int cohorteAnio
-        int semestreActual
-        enum estado "ACTIVO, GRADUADO, DESERTOR, APLAZADO"
-        boolean consentimientoDatos "Ley 1581"
-        datetime fechaConsentimiento
-    }
-    MATRICULAS {
-        uuid id PK
-        uuid estudianteId FK
-        uuid periodoId FK
+        string nombre
+        string programa
         int semestre
-        int valorMatricula
+        float promedio "opcional"
+        int materiasPerdidas "opcional"
+        float asistencia "opcional"
+        int estrato "opcional"
+        bool trabaja "opcional"
+        bool apoyoFinanciero "opcional"
+        bool moraMatricula "opcional"
+        int puntajeSaber11 "opcional"
+        int edad "opcional"
+        enum estado "ACTIVO | RETIRADO | GRADUADO"
+        string periodo
+        uuid cargaId FK
     }
-    NOTAS_SEMESTRE {
+    EVALUACIONES {
         uuid id PK
         uuid estudianteId FK
-        uuid periodoId FK
-        int semestre
-        float promedio "0-5"
-        int materiasInscritas
-        int materiasPerdidas
-        float asistenciaPct
-    }
-    FINANCIACION {
-        uuid id PK
-        uuid estudianteId FK
-        enum tipo "PROPIOS, ICETEX, BECA, CREDITO_UCC"
-        int porcentajeCubierto
-        int montoTotal
-        int saldoPendiente
-        float tasaEA
-        int plazoMeses
-    }
-    CAUSAS_DESERCION {
-        uuid id PK
-        string nombre UK
-        enum categoria "SPADIES: INDIVIDUAL, ACADEMICA, SOCIOECONOMICA, INSTITUCIONAL"
-        string descripcion
-    }
-    RETIROS {
-        uuid id PK
-        uuid estudianteId FK "UK"
-        uuid periodoId FK
-        int semestreRetiro
-        datetime fechaRetiro
-        uuid causaId FK
-        string observacion
-    }
-    ENCUESTAS {
-        uuid id PK
-        uuid estudianteId FK
-        datetime fecha
-        boolean consentimiento "Ley 1581"
-        boolean autorizaContacto
         int puntaje "0-100"
-        enum nivel
-        json puntajesDimension
-    }
-    RESPUESTAS_ENCUESTA {
-        uuid id PK
-        uuid encuestaId FK
-        string clave
-        enum dimension
-        int valor "Likert 1-5"
-    }
-    PUNTAJES_RIESGO {
-        uuid id PK
-        uuid estudianteId FK
-        uuid periodoId FK
-        int puntaje "0-100"
-        enum nivel "BAJO, MEDIO, ALTO"
-        json factores "explicabilidad"
+        enum nivel "BAJO | MEDIO | ALTO"
+        string metodo "FACTORES | MODELO"
         string modeloVersion
-    }
-    ALERTAS {
-        uuid id PK
-        uuid estudianteId FK
-        uuid creadaPorId FK
-        uuid cursoId FK "si la reporta un docente"
-        enum origen "DOCENTE, MODELO, ENCUESTA, BIENESTAR"
-        string motivo
-        enum estado
-    }
-    INTERVENCIONES {
-        uuid id PK
-        uuid estudianteId FK
-        uuid responsableId FK
-        enum tipo
-        datetime fecha
-        string descripcion
-        int montoApoyo
-        enum estado
-        uuid periodoId FK
-        uuid alertaId FK
-        string resultado
-    }
-    PARAMETROS_ECONOMICOS {
-        uuid id PK
-        enum categoria "SALARIO, COSTO, FINANCIERO, ESCENARIO, SPADIES"
-        string clave "UK con programaId"
-        string nombre
-        float valor
-        string unidad
-        string fuente
-        uuid programaId FK "NULL = global"
-        uuid actualizadoPorId FK
-    }
-    CURSOS {
-        uuid id PK
-        string codigo "UK con periodoId"
-        string nombre
-        int semestre
-        int creditos
-        uuid programaId FK
-        uuid periodoId FK
-        uuid docenteId FK
-    }
-    INSCRIPCIONES {
-        uuid id PK
-        uuid cursoId FK
-        uuid estudianteId FK
-        float notaParcial
-        float asistenciaPct
-        int fallas
+        json factores
+        string_lista faltantes
+        text explicacion "agente IA"
+        string modeloIa
     }
     MODELOS_RIESGO {
         uuid id PK
         string version UK
-        string origen "PYTHON_SKLEARN o ENTRENAMIENTO_ADMIN"
-        json definicion "coeficientes, medias, umbrales"
-        json metricas "AUC, Brier, calibración"
-        boolean activo
-        uuid entrenadoPorId FK
-    }
-    IMPORTACIONES {
-        uuid id PK
-        string archivo
-        int filas
-        int estudiantesNuevos
-        int estudiantesActualizados
-        int semestres
-        uuid usuarioId FK
-        datetime creadaEn
-    }
-    AUDITORIA_ACCESOS {
-        uuid id PK
-        uuid usuarioId FK
-        string rol
-        string accion "CONSULTA_FICHA, EXPORTACION, ADMIN_MODELO..."
-        string recurso "código anónimo, nunca nombres"
-        string detalle
-        datetime creadoEn
+        json definicion
+        json metricas
+        bool activo
     }
