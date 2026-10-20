@@ -10,10 +10,10 @@ export function Paginacion({ pagina, paginas, total, base, params, unidad = "est
     const s = q.toString();
     return s ? `${base}?${s}` : base;
   };
-  const clase = "inline-flex h-9 items-center gap-1 rounded-md border px-3 text-sm hover:bg-secondary";
+  const clase = "inline-flex h-9 items-center gap-1 rounded-sm border border-tinta/25 bg-card px-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-tinta hover:border-tinta";
   return (
     <nav aria-label="Paginación" className="flex flex-wrap items-center justify-between gap-3 text-sm">
-      <span className="text-muted-foreground">{total.toLocaleString("es-CO")} {unidad} · página {pagina} de {paginas}</span>
+      <span className="meta">{total.toLocaleString("es-CO")} {unidad} · página {pagina} de {paginas}</span>
       <div className="flex gap-2">
         {pagina > 1 ? <Link href={url(pagina - 1)} className={clase}><ChevronLeft className="h-4 w-4" aria-hidden /> Anterior</Link> : <span className={`${clase} pointer-events-none opacity-40`}><ChevronLeft className="h-4 w-4" aria-hidden /> Anterior</span>}
         {pagina < paginas ? <Link href={url(pagina + 1)} className={clase}>Siguiente <ChevronRight className="h-4 w-4" aria-hidden /></Link> : <span className={`${clase} pointer-events-none opacity-40`}>Siguiente <ChevronRight className="h-4 w-4" aria-hidden /></span>}

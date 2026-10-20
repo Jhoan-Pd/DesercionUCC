@@ -40,20 +40,20 @@ export function Dialog({ abierto, onCerrar, titulo, descripcion, children, class
   if (!abierto) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onCerrar} aria-hidden />
+      <div className="absolute inset-0 bg-tinta/40 backdrop-blur-[2px]" onClick={onCerrar} aria-hidden />
       <div
         ref={ref}
         role="dialog"
         aria-modal="true"
         aria-labelledby={idTitulo}
         aria-describedby={descripcion ? idDesc : undefined}
-        className={cn("relative z-10 w-full max-w-lg rounded-t-xl bg-card p-5 shadow-xl sm:rounded-xl", className)}
+        className={cn("relative z-10 w-full max-w-lg rounded-t-xl bg-card p-6 shadow-[0_12px_40px_rgba(0,0,0,0.18)] sm:rounded-xl", className)}
       >
         <button data-cerrar onClick={onCerrar} aria-label="Cerrar" className="absolute right-3 top-3 rounded p-1 text-muted-foreground hover:bg-secondary">
           <X className="h-4 w-4" />
         </button>
-        <h2 id={idTitulo} className="pr-8 text-lg font-semibold">{titulo}</h2>
-        {descripcion && <p id={idDesc} className="mt-1 text-sm text-muted-foreground">{descripcion}</p>}
+        <h2 id={idTitulo} className="titulo-serif pr-8 text-[28px]">{titulo}</h2>
+        {descripcion && <p id={idDesc} className="mt-2 text-sm text-grafito">{descripcion}</p>}
         <div className="mt-4">{children}</div>
       </div>
     </div>
