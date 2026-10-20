@@ -4,23 +4,23 @@
 
 @layer base {
   :root {
-    --background: 210 33% 98%;
-    --foreground: 215 28% 14%;
+    --background: 0 0% 97.6%; /* papel #F9F9F9 */
+    --foreground: 0 0% 18.8%; /* tinta #303030 */
     --card: 0 0% 100%;
-    --card-foreground: 215 28% 14%;
-    --primary: 208 100% 31%; /* UCC azul #00549F */
+    --card-foreground: 0 0% 18.8%;
+    --primary: 0 0% 18.8%; /* botones en tinta */
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 25% 94%;
-    --secondary-foreground: 215 28% 20%;
-    --muted: 210 25% 94%;
-    --muted-foreground: 215 14% 38%;
-    --accent: 84 70% 38%;
+    --secondary: 0 0% 94.5%;
+    --secondary-foreground: 0 0% 18.8%;
+    --muted: 0 0% 94.5%;
+    --muted-foreground: 0 0% 40%; /* #666: contraste AA sobre papel y blanco */
+    --accent: 187 51% 34%; /* petróleo #2B7983 */
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 45%;
+    --destructive: 346 80% 37%; /* coral oscuro, legible como texto */
     --destructive-foreground: 0 0% 100%;
-    --border: 214 20% 87%;
-    --input: 214 20% 80%;
-    --ring: 208 100% 31%;
+    --border: 0 0% 89%; /* filete: tinta al 11 % sobre papel */
+    --input: 0 0% 80%;
+    --ring: 187 51% 34%;
   }
 
   * {
@@ -30,8 +30,32 @@
     -webkit-text-size-adjust: 100%;
   }
   body {
-    @apply bg-background text-foreground antialiased;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    @apply bg-background font-sans text-foreground antialiased;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  ::selection {
+    background: #c8dbd7;
+  }
+}
+
+@layer components {
+  /* Títulos editoriales: serif, interlineado corto y letras juntas */
+  .titulo-serif {
+    @apply font-serif font-semibold leading-[0.95] tracking-[-0.01em] text-tinta;
+    font-variant-numeric: lining-nums;
+  }
+  /* Ceja de sección: «[01] INICIO» en versalitas espaciadas */
+  .ceja {
+    @apply text-[13px] font-medium uppercase tracking-ceja text-tinta;
+  }
+  /* Texto técnico (fuentes, fechas, códigos) */
+  .meta {
+    @apply font-mono text-xs tracking-[0.04em] text-piedra;
+  }
+  /* Enlace subrayado tipo «read more» */
+  .enlace {
+    @apply underline decoration-tinta/40 decoration-1 underline-offset-4 transition-colors hover:decoration-tinta;
   }
 }
 
@@ -42,4 +66,13 @@
 .recharts-text {
   fill: hsl(var(--muted-foreground));
   font-size: 12px;
+  font-family: "Manrope Variable", Manrope, sans-serif;
+}
+
+/* Barra de navegación desplazable en móvil sin barra de desplazamiento visible */
+.sin-barra {
+  scrollbar-width: none;
+}
+.sin-barra::-webkit-scrollbar {
+  display: none;
 }
