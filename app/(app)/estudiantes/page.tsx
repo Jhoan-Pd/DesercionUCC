@@ -12,7 +12,7 @@ import { BarraPuntaje } from "@/components/estudiantes/BarraPuntaje";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 export const metadata = { title: "Estudiantes en riesgo" };
@@ -30,12 +30,12 @@ export default async function EstudiantesPage({ searchParams }: { searchParams: 
   if (programas.length === 0) {
     return (
       <>
-        <Encabezado titulo="Estudiantes en riesgo" />
+        <Encabezado seccion="/estudiantes" titulo="a quién acompañar primero." />
         <Vacio
-          titulo="Todavía no hay estudiantes cargados"
+          titulo="todavía no hay estudiantes cargados."
           accion={
             session?.user.rol === "ADMIN" ? (
-              <Link href="/cargar" className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-ucc-azul-oscuro">
+              <Link href="/cargar" className={buttonVariants()}>
                 Cargar datos
               </Link>
             ) : null
@@ -55,7 +55,8 @@ export default async function EstudiantesPage({ searchParams }: { searchParams: 
   return (
     <>
       <Encabezado
-        titulo="Estudiantes en riesgo"
+        seccion="/estudiantes"
+        titulo="a quién acompañar primero."
         descripcion="Estudiantes activos ordenados del mayor al menor riesgo. Abre la ficha para ver los factores y la explicación del agente."
       />
 
@@ -90,7 +91,7 @@ export default async function EstudiantesPage({ searchParams }: { searchParams: 
             <div className="flex gap-2">
               <Button type="submit">Filtrar</Button>
               {hayFiltros && (
-                <Link href="/estudiantes" className="inline-flex h-10 items-center rounded-md border px-3 text-sm hover:bg-secondary">
+                <Link href="/estudiantes" className={buttonVariants({ variant: "ghost" })}>
                   Limpiar
                 </Link>
               )}
@@ -100,7 +101,7 @@ export default async function EstudiantesPage({ searchParams }: { searchParams: 
       </Card>
 
       {lista.total === 0 ? (
-        <Vacio titulo="Ningún estudiante coincide con los filtros" />
+        <Vacio titulo="ningún estudiante coincide.">Prueba con otro programa o nivel, o limpia los filtros para ver la lista completa.</Vacio>
       ) : (
         <Card>
           <CardContent className="space-y-4 pt-5">
@@ -110,17 +111,17 @@ export default async function EstudiantesPage({ searchParams }: { searchParams: 
                 <li key={e.codigo} className="py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <Link href={`/estudiantes/${encodeURIComponent(e.codigo)}`} className="font-medium text-primary hover:underline">
+                      <Link href={`/estudiantes/${encodeURIComponent(e.codigo)}`} className="font-semibold text-tinta hover:underline hover:underline-offset-4">
                         {e.nombre}
                       </Link>
                       <p className="text-xs text-muted-foreground">
-                        {e.codigo} · {e.programa} · sem. {e.semestre}
+                        <span className="font-mono">{e.codigo}</span> · {e.programa} · sem. {e.semestre}
                       </p>
                     </div>
                     {e.nivel && e.puntaje !== null && (
                       <div className="flex shrink-0 flex-col items-end gap-1">
                         <NivelBadge nivel={e.nivel} />
-                        <span className="text-sm font-semibold tabular-nums">{e.puntaje}</span>
+                        <span className="font-serif text-[22px] font-semibold leading-none lining-nums tabular-nums">{e.puntaje}</span>
                       </div>
                     )}
                   </div>
@@ -144,10 +145,10 @@ export default async function EstudiantesPage({ searchParams }: { searchParams: 
                   {lista.filas.map((e) => (
                     <TR key={e.codigo}>
                       <TD>
-                        <Link href={`/estudiantes/${encodeURIComponent(e.codigo)}`} className="font-medium text-primary hover:underline">
+                        <Link href={`/estudiantes/${encodeURIComponent(e.codigo)}`} className="font-semibold text-tinta hover:underline hover:underline-offset-4">
                           {e.nombre}
                         </Link>
-                        <span className="block text-xs text-muted-foreground">{e.codigo}</span>
+                        <span className="block font-mono text-[11px] text-piedra">{e.codigo}</span>
                       </TD>
                       <TD>{e.programa}</TD>
                       <TD className="text-right tabular-nums">{e.semestre}</TD>
