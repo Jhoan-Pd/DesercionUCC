@@ -5,6 +5,7 @@ import { ServicioCarga } from "@/services/carga/ServicioCarga";
 import { Encabezado } from "@/components/comunes/Encabezado";
 import { CargaArchivo } from "@/components/carga/CargaArchivo";
 import { BorrarDatos } from "@/components/carga/BorrarDatos";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
@@ -15,12 +16,13 @@ const n = (v: number) => v.toLocaleString("es-CO");
 
 export default async function CargarPage() {
   const [historial, total] = await Promise.all([new ServicioCarga().historial(), prisma.estudiante.count()]);
-  const enlace = "inline-flex h-9 items-center gap-2 rounded-md border bg-card px-3 text-sm hover:bg-secondary";
+  const enlace = buttonVariants({ variant: "outline", size: "sm" });
 
   return (
     <>
       <Encabezado
-        titulo="Cargar datos de estudiantes"
+        seccion="/cargar"
+        titulo="datos reales, nunca inventados."
         descripcion="Sube el archivo real de la universidad (Registro Académico o Bienestar). Si un código ya existe, se actualiza. Después de cada carga se recalcula el riesgo de todos los estudiantes activos."
       >
         <a href="/api/cargas/plantilla" className={enlace}>
@@ -31,10 +33,10 @@ export default async function CargarPage() {
         </a>
       </Encabezado>
 
-      <div className="grid items-start gap-4 [&>*]:min-w-0 xl:grid-cols-[3fr_2fr]">
+      <div className="grid items-start gap-5 [&>*]:min-w-0 xl:grid-cols-[3fr_2fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Subir archivo</CardTitle>
+            <CardTitle>subir archivo.</CardTitle>
             <CardDescription>Actualmente hay {n(total)} estudiantes cargados.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -44,16 +46,16 @@ export default async function CargarPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Columnas del archivo</CardTitle>
+            <CardTitle>columnas del archivo.</CardTitle>
             <CardDescription>Solo las 4 primeras son obligatorias. Lo que no venga no se usa para el riesgo (nunca se inventa).</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="divide-y text-sm">
               {COLUMNAS.map((c) => (
                 <li key={c.campo} className="py-2">
-                  <code className="rounded bg-secondary px-1 text-xs">{c.alias[0]}</code>
-                  {c.obligatoria && <span className="ml-2 text-xs font-semibold text-red-700">obligatoria</span>}
-                  <p className="text-muted-foreground">{c.descripcion}</p>
+                  <code className="rounded-sm bg-bruma px-1.5 py-0.5 font-mono text-xs text-marino">{c.alias[0]}</code>
+                  {c.obligatoria && <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-riesgo-alto">obligatoria</span>}
+                  <p className="mt-1 text-grafito">{c.descripcion}</p>
                 </li>
               ))}
             </ul>
@@ -66,11 +68,11 @@ export default async function CargarPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Historial de cargas</CardTitle>
+          <CardTitle>historial de cargas.</CardTitle>
         </CardHeader>
         <CardContent>
           {historial.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Todavía no se ha cargado ningún archivo.</p>
+            <p className="meta">{"// todavía no se ha cargado ningún archivo"}</p>
           ) : (
             <Table>
               <THead>
@@ -86,7 +88,7 @@ export default async function CargarPage() {
               <TBody>
                 {historial.map((c) => (
                   <TR key={c.id}>
-                    <TD className="whitespace-nowrap">{new Date(c.creadaEn).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" })}</TD>
+                    <TD className="whitespace-nowrap font-mono text-xs">{new Date(c.creadaEn).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" })}</TD>
                     <TD className="max-w-[240px] truncate">{c.archivo}</TD>
                     <TD>{c.usuario}</TD>
                     <TD className="text-right tabular-nums">{n(c.nuevos)}</TD>
@@ -102,7 +104,7 @@ export default async function CargarPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Empezar de cero</CardTitle>
+          <CardTitle>empezar de cero.</CardTitle>
           <CardDescription>Útil si se cargó un archivo equivocado.</CardDescription>
         </CardHeader>
         <CardContent>

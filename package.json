@@ -1,6 +1,6 @@
 {
   "name": "observatorio-desercion-ucc",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Observatorio de Deserción UCC - detecta a tiempo a los estudiantes que podrían retirarse, con datos reales y un agente de IA (Gemini)",
   "scripts": {
@@ -26,6 +26,8 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@fontsource/cormorant-garamond": "^5.3.0",
     "@hookform/resolvers": "^3.9.0",
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",

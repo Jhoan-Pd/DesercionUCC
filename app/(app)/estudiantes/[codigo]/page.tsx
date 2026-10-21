@@ -22,20 +22,22 @@ export default async function FichaPage({ params }: { params: { codigo: string }
 
   return (
     <>
-      <Link href="/estudiantes" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" aria-hidden /> Volver a la lista
+      <Link href="/estudiantes" className="inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-piedra hover:text-tinta">
+        <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Volver a la lista
       </Link>
       <Encabezado
+        seccion="/estudiantes"
+        ceja="Ficha"
         titulo={e.nombre}
         descripcion={
           <>
-            Código {e.codigo} · {e.programa} · semestre {e.datos.semestre}
+            <span className="font-mono text-[13px]">{e.codigo}</span> · {e.programa} · semestre {e.datos.semestre}
             {e.periodo ? ` · periodo ${e.periodo}` : ""} · {ESTADO[e.estado]}
           </>
         }
       >
         {ev && (
-          <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-2">
+          <div className="flex items-center gap-4 rounded-xl border bg-card px-5 py-3">
             <NivelBadge nivel={ev.nivel} />
             <BarraPuntaje puntaje={ev.puntaje} nivel={ev.nivel} />
           </div>
@@ -48,12 +50,12 @@ export default async function FichaPage({ params }: { params: { codigo: string }
         </Alert>
       )}
 
-      <div className="grid gap-4 [&>*]:min-w-0 xl:grid-cols-[3fr_2fr]">
-        <div className="space-y-4">
+      <div className="grid gap-5 [&>*]:min-w-0 xl:grid-cols-[3fr_2fr]">
+        <div className="space-y-5">
           {ev && (
             <Card>
               <CardHeader>
-                <CardTitle>¿Por qué este nivel de riesgo?</CardTitle>
+                <CardTitle>¿por qué este nivel de riesgo?</CardTitle>
                 <CardDescription>
                   {ev.metodo === "MODELO"
                     ? `Modelo entrenado con estudiantes de la UCC (${ev.modeloVersion}). Los puntos reparten el riesgo que tiene por encima de un estudiante promedio según lo que pesa cada dato.`
@@ -70,9 +72,9 @@ export default async function FichaPage({ params }: { params: { codigo: string }
                         <div>
                           <p className="font-medium">{f.etiqueta}</p>
                           <p className="text-sm text-muted-foreground">{f.detalle}</p>
-                          {f.fuente && <p className="mt-0.5 text-xs text-muted-foreground/80">Fuente: {f.fuente}</p>}
+                          {f.fuente && <p className="meta mt-1">{"// fuente: "}{f.fuente}</p>}
                         </div>
-                        <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-sm font-semibold tabular-nums">+{f.puntos}</span>
+                        <span className="shrink-0 rounded-sm bg-hoja px-2 py-0.5 font-mono text-xs font-semibold tabular-nums text-pino">+{f.puntos}</span>
                       </li>
                     ))}
                   </ul>
@@ -90,7 +92,7 @@ export default async function FichaPage({ params }: { params: { codigo: string }
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Bot className="h-4 w-4" aria-hidden /> Explicación del agente
+                  <Bot className="h-5 w-5 text-petroleo" aria-hidden /> explicación del agente.
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -102,7 +104,7 @@ export default async function FichaPage({ params }: { params: { codigo: string }
 
         <Card className="h-fit">
           <CardHeader>
-            <CardTitle>Datos del estudiante</CardTitle>
+            <CardTitle>datos del estudiante.</CardTitle>
             <CardDescription>
               {e.cargadoDe ? `Del archivo «${e.cargadoDe.archivo}» (${new Date(e.cargadoDe.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })})` : "Cargado por el administrador"}
             </CardDescription>
@@ -113,7 +115,7 @@ export default async function FichaPage({ params }: { params: { codigo: string }
                 const valor = e.datos[v.clave];
                 return (
                   <div key={v.clave} className="flex justify-between gap-4 py-2">
-                    <dt className="text-muted-foreground">{v.etiqueta}</dt>
+                    <dt className="text-grafito">{v.etiqueta}</dt>
                     <dd className={tieneValor(valor) ? "font-medium tabular-nums" : "italic text-muted-foreground"}>{tieneValor(valor) ? v.formato(valor) : "Sin dato"}</dd>
                   </div>
                 );

@@ -8,6 +8,7 @@ import { Indicador } from "@/components/comunes/Indicador";
 import { Vacio } from "@/components/comunes/Vacio";
 import { MetodoRiesgo } from "@/components/estudiantes/MetodoRiesgo";
 import { BarraNiveles, LeyendaNiveles } from "@/components/estudiantes/BarraNiveles";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
@@ -16,7 +17,6 @@ export const dynamic = "force-dynamic";
 
 const n = (v: number) => v.toLocaleString("es-CO");
 const pct = (v: number, total: number) => (total > 0 ? `${Math.round((v / total) * 100)} % de los activos` : "");
-const boton = "inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-medium";
 
 export default async function InicioPage() {
   const session = await getServerSession(authOptions);
@@ -26,12 +26,12 @@ export default async function InicioPage() {
   if (r.activos === 0) {
     return (
       <>
-        <Encabezado titulo="Inicio" descripcion="Resumen del riesgo de deserción de los estudiantes de la UCC sede Pasto." />
+        <Encabezado seccion="/inicio" titulo="detectar a tiempo." descripcion="Resumen del riesgo de deserción de los estudiantes de la UCC sede Pasto." />
         <Vacio
-          titulo="Todavía no hay estudiantes cargados"
+          titulo="todavía no hay estudiantes cargados."
           accion={
             esAdmin ? (
-              <Link href="/cargar" className={`${boton} bg-primary text-primary-foreground hover:bg-ucc-azul-oscuro`}>
+              <Link href="/cargar" className={buttonVariants()}>
                 <Upload className="h-4 w-4" aria-hidden /> Cargar el archivo de estudiantes
               </Link>
             ) : null
@@ -42,7 +42,7 @@ export default async function InicioPage() {
             : "El sistema solo trabaja con datos reales de la universidad. Cuando el administrador cargue el archivo de estudiantes, aquí verás el resumen del riesgo."}
           <p className="mt-2">
             Mientras tanto puedes consultar las{" "}
-            <Link href="/cifras-ucc" className="font-medium text-primary hover:underline">
+            <Link href="/cifras-ucc" className="enlace font-medium text-tinta">
               cifras oficiales de la UCC Pasto
             </Link>
             .
@@ -54,28 +54,28 @@ export default async function InicioPage() {
 
   return (
     <>
-      <Encabezado titulo="Inicio" descripcion="Resumen del riesgo de deserción de los estudiantes activos cargados.">
-        <Link href="/estudiantes?nivel=ALTO" className={`${boton} bg-primary text-primary-foreground hover:bg-ucc-azul-oscuro`}>
+      <Encabezado seccion="/inicio" titulo="detectar a tiempo." descripcion="Resumen del riesgo de deserción de los estudiantes activos cargados.">
+        <Link href="/estudiantes?nivel=ALTO" className={buttonVariants()}>
           Ver riesgo alto
         </Link>
-        <Link href="/agente" className={`${boton} border bg-card hover:bg-secondary`}>
+        <Link href="/agente" className={buttonVariants({ variant: "outline" })}>
           <Bot className="h-4 w-4" aria-hidden /> Preguntar al agente
         </Link>
       </Encabezado>
 
-      <div className="grid gap-4 [&>*]:min-w-0 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0 sm:gap-5 xl:grid-cols-4">
         <Indicador etiqueta="Estudiantes activos" valor={n(r.activos)} icono={<Users className="h-4 w-4" aria-hidden />} nota={r.ultimaCarga ? `Última carga: ${new Date(r.ultimaCarga.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })}` : undefined} />
-        <Indicador etiqueta="Riesgo alto" valor={n(r.nivel.ALTO)} nota={pct(r.nivel.ALTO, r.activos)} icono={<AlertOctagon className="h-4 w-4 text-red-700" aria-hidden />} />
-        <Indicador etiqueta="Riesgo medio" valor={n(r.nivel.MEDIO)} nota={pct(r.nivel.MEDIO, r.activos)} icono={<AlertTriangle className="h-4 w-4 text-amber-700" aria-hidden />} />
-        <Indicador etiqueta="Riesgo bajo" valor={n(r.nivel.BAJO)} nota={pct(r.nivel.BAJO, r.activos)} icono={<CheckCircle2 className="h-4 w-4 text-green-700" aria-hidden />} />
+        <Indicador etiqueta="Riesgo alto" valor={n(r.nivel.ALTO)} nota={pct(r.nivel.ALTO, r.activos)} icono={<AlertOctagon className="h-4 w-4 text-riesgo-alto" aria-hidden />} />
+        <Indicador etiqueta="Riesgo medio" valor={n(r.nivel.MEDIO)} nota={pct(r.nivel.MEDIO, r.activos)} icono={<AlertTriangle className="h-4 w-4 text-riesgo-medio" aria-hidden />} />
+        <Indicador etiqueta="Riesgo bajo" valor={n(r.nivel.BAJO)} nota={pct(r.nivel.BAJO, r.activos)} icono={<CheckCircle2 className="h-4 w-4 text-riesgo-bajo" aria-hidden />} />
       </div>
 
       <MetodoRiesgo modelo={r.modelo} />
 
-      <div className="grid gap-4 [&>*]:min-w-0 xl:grid-cols-[3fr_2fr]">
+      <div className="grid gap-5 [&>*]:min-w-0 xl:grid-cols-[3fr_2fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Riesgo por programa</CardTitle>
+            <CardTitle>riesgo por programa.</CardTitle>
             <CardDescription>Ordenado por número de estudiantes en riesgo alto</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -93,7 +93,7 @@ export default async function InicioPage() {
                 {r.programas.map((p) => (
                   <TR key={p.programa}>
                     <TD>
-                      <Link href={`/estudiantes?programa=${encodeURIComponent(p.programa)}`} className="font-medium hover:underline">
+                      <Link href={`/estudiantes?programa=${encodeURIComponent(p.programa)}`} className="font-medium hover:underline hover:underline-offset-4">
                         {p.programa}
                       </Link>
                     </TD>
@@ -111,7 +111,7 @@ export default async function InicioPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Factores más frecuentes</CardTitle>
+            <CardTitle>factores más frecuentes.</CardTitle>
             <CardDescription>Entre los estudiantes con riesgo medio o alto</CardDescription>
           </CardHeader>
           <CardContent>
@@ -125,10 +125,10 @@ export default async function InicioPage() {
                     <li key={f.etiqueta} className="space-y-1">
                       <div className="flex justify-between gap-2 text-sm">
                         <span>{f.etiqueta}</span>
-                        <span className="tabular-nums text-muted-foreground">{n(f.n)}</span>
+                        <span className="font-mono text-xs tabular-nums text-piedra">{n(f.n)}</span>
                       </div>
-                      <div className="h-2 rounded-full bg-secondary" role="presentation">
-                        <div className="h-2 rounded-full bg-ucc-azul" style={{ width: `${(f.n / max) * 100}%` }} />
+                      <div className="h-1.5 rounded-full bg-secondary" role="presentation">
+                        <div className="h-1.5 rounded-full bg-petroleo" style={{ width: `${(f.n / max) * 100}%` }} />
                       </div>
                     </li>
                   );

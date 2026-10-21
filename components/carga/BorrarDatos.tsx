@@ -39,8 +39,8 @@ export function BorrarDatos({ total }: { total: number }) {
           <Trash2 className="h-4 w-4" aria-hidden /> Borrar todos los estudiantes
         </Button>
       ) : (
-        <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-900">
+        <div className="space-y-3 rounded-lg border border-riesgo-alto-borde bg-riesgo-alto-fondo p-4">
+          <p className="text-sm text-riesgo-alto">
             Se borrarán los {total.toLocaleString("es-CO")} estudiantes, sus evaluaciones, el historial de cargas y los modelos entrenados. Las cuentas de usuario no se tocan.
             Escribe <strong>BORRAR</strong> para confirmar.
           </p>

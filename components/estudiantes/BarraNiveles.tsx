@@ -11,7 +11,7 @@ export function BarraNiveles({ alto, medio, bajo }: { alto: number; medio: numbe
     { n: bajo, color: COLOR_NIVEL.BAJO },
   ].filter((p) => p.n > 0);
   return (
-    <div className="flex h-3 w-full gap-[2px] overflow-hidden rounded" role="img" aria-label={`${alto} en riesgo alto, ${medio} medio y ${bajo} bajo`}>
+    <div className="flex h-2.5 w-full gap-[2px] overflow-hidden rounded-sm" role="img" aria-label={`${alto} en riesgo alto, ${medio} medio y ${bajo} bajo`}>
       {partes.map((p, i) => (
         <div key={i} style={{ width: `${(p.n / total) * 100}%`, background: p.color }} title={String(p.n)} />
       ))}
@@ -21,7 +21,7 @@ export function BarraNiveles({ alto, medio, bajo }: { alto: number; medio: numbe
 
 export function LeyendaNiveles() {
   return (
-    <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+    <div className="flex flex-wrap gap-5 text-[11px] font-semibold uppercase tracking-[0.12em] text-grafito">
       <span className="inline-flex items-center gap-1">
         <AlertOctagon className="h-3.5 w-3.5" style={{ color: COLOR_NIVEL.ALTO }} aria-hidden /> Alto
       </span>

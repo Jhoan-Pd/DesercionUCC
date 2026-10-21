@@ -16,7 +16,7 @@ function Ayuda({ active, payload, unidad }: { active?: boolean; payload?: { payl
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   return (
-    <div className="rounded-md border bg-card px-3 py-2 text-xs shadow-md">
+    <div className="rounded-md border bg-card px-3 py-2 text-xs shadow-suave">
       <p className="font-semibold">{p.etiqueta}</p>
       <p className="tabular-nums text-muted-foreground">
         {fmt(p.valor)} {unidad}
@@ -35,7 +35,7 @@ export function GraficaColumnas({ datos, unidad, alto = 260, titulo }: { datos: 
           <XAxis dataKey="etiqueta" tickLine={false} axisLine={false} fontSize={12} />
           <YAxis tickFormatter={fmt} tickLine={false} axisLine={false} fontSize={12} width={48} />
           <Tooltip cursor={{ fill: "hsl(var(--secondary))" }} content={<Ayuda unidad={unidad} />} />
-          <Bar dataKey="valor" radius={[4, 4, 0, 0]} fill={COLOR.ucc}>
+          <Bar dataKey="valor" radius={[2, 2, 0, 0]} fill={COLOR.serie}>
             <LabelList dataKey="valor" position="top" formatter={fmt} fontSize={11} fill="hsl(var(--muted-foreground))" />
           </Bar>
         </BarChart>
@@ -54,9 +54,9 @@ export function GraficaBarras({ datos, unidad, titulo, anchoEtiqueta = 170 }: { 
           <XAxis type="number" hide />
           <YAxis type="category" dataKey="etiqueta" width={anchoEtiqueta} tickLine={false} axisLine={false} fontSize={12} interval={0} />
           <Tooltip cursor={{ fill: "hsl(var(--secondary))" }} content={<Ayuda unidad={unidad} />} />
-          <Bar dataKey="valor" radius={[0, 4, 4, 0]}>
+          <Bar dataKey="valor" radius={[0, 2, 2, 0]}>
             {datos.map((d) => (
-              <Cell key={d.etiqueta} fill={!hayDestacado || d.destacado ? COLOR.ucc : COLOR.uccClaro} />
+              <Cell key={d.etiqueta} fill={!hayDestacado || d.destacado ? COLOR.serie : COLOR.contexto} />
             ))}
             <LabelList dataKey="valor" position="right" formatter={fmt} fontSize={11} fill="hsl(var(--muted-foreground))" />
           </Bar>

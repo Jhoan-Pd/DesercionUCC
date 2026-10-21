@@ -1,9 +1,9 @@
 /**
- * Colores de las gráficas. Una sola serie usa el azul institucional UCC; el azul claro marca
- * el contexto cuando se resalta una barra (p. ej. la sede Pasto frente a las demás sedes).
+ * Colores de las gráficas. Una sola serie usa el petróleo; cuando se resalta una barra
+ * (p. ej. la sede Pasto frente a las demás sedes) el resto va en verde agua claro.
  * Los niveles de riesgo usan colores de estado (siempre acompañados de ícono y texto).
  */
 export const COLOR = {
-  ucc: "#00549F",
-  uccClaro: "#8DB7DF",
+  serie: "#2B7983",
+  contexto: "#C8DBD7",
 } as const;

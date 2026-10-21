@@ -35,7 +35,7 @@ export function FormularioLogin({ callbackUrl }: { callbackUrl?: string }) {
       setError(
         res?.error === ERROR_CUENTA_BLOQUEADA
           ? `Por seguridad, la cuenta quedó bloqueada ${MINUTOS_BLOQUEO} minutos tras ${MAX_INTENTOS} intentos fallidos. Intenta más tarde o contacta al administrador.`
-          : "Correo o contraseña incorrectos, o la cuenta está inactiva.",
+          : "No pudimos iniciar sesión: el correo o la contraseña no coinciden, o la cuenta está inactiva. Revisa los datos e inténtalo de nuevo.",
       );
       return;
     }
@@ -61,7 +61,7 @@ export function FormularioLogin({ callbackUrl }: { callbackUrl?: string }) {
       </div>
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-        {isSubmitting ? "Ingresando..." : "Ingresar"}
+        {isSubmitting ? "Ingresando…" : "Ingresar"}
       </Button>
     </form>
   );

@@ -66,11 +66,11 @@ export function CargaArchivo() {
           const f = e.dataTransfer.files?.[0];
           if (f) setArchivo(f);
         }}
-        className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors ${arrastrando ? "border-primary bg-primary/5" : "hover:bg-secondary/50"}`}
+        className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-tinta/25 bg-papel px-6 py-12 text-center transition-colors ${arrastrando ? "border-petroleo bg-hoja" : "hover:border-tinta/50"}`}
       >
-        <FileSpreadsheet className="h-10 w-10 text-primary" aria-hidden />
+        <FileSpreadsheet className="h-9 w-9 text-petroleo" aria-hidden />
         <span className="font-medium">{archivo ? archivo.name : "Arrastra aquí el archivo o haz clic para elegirlo"}</span>
-        <span className="text-xs text-muted-foreground">{archivo ? `${(archivo.size / 1024).toLocaleString("es-CO", { maximumFractionDigits: 0 })} KB` : "Excel (.xlsx) o CSV · máximo 5 MB"}</span>
+        <span className="meta">{archivo ? `${(archivo.size / 1024).toLocaleString("es-CO", { maximumFractionDigits: 0 })} KB` : "Excel (.xlsx) o CSV · máximo 5 MB"}</span>
         <input ref={entrada} type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="sr-only" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} />
       </label>
 
@@ -98,14 +98,14 @@ export function CargaArchivo() {
           )}
           {resumen.ignoradas.length > 0 && <Alert variant="warning">Columnas que no se reconocieron y se ignoraron: {resumen.ignoradas.join(", ")}.</Alert>}
           {resumen.totalErrores > 0 && (
-            <div className="rounded-lg border border-red-200">
-              <p className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-900">
+            <div className="rounded-lg border border-riesgo-alto-borde">
+              <p className="border-b border-riesgo-alto-borde bg-riesgo-alto-fondo px-4 py-2 text-sm font-semibold text-riesgo-alto">
                 {n(resumen.totalErrores)} filas no se cargaron{resumen.totalErrores > resumen.errores.length ? ` (se muestran las primeras ${resumen.errores.length})` : ""}
               </p>
               <ul className="max-h-64 divide-y overflow-y-auto text-sm">
                 {resumen.errores.map((e, i) => (
                   <li key={i} className="px-4 py-2">
-                    <span className="font-medium">Fila {e.fila}:</span> {e.mensaje}
+                    <span className="font-mono text-xs font-semibold">fila {e.fila}:</span> {e.mensaje}
                   </li>
                 ))}
               </ul>
