@@ -28,6 +28,14 @@ Proyecto final de la asignatura *Programación Orientada a la Web*.
 
 Hay dos roles: **Administrador** (carga datos y gestiona cuentas) y **Bienestar Universitario** (consulta el riesgo y usa el agente).
 
+**Diseño.** Estilo editorial y sobrio:
+
+- fondo papel (`#F9F9F9`) con tinta grafito (`#303030`) y acentos apagados (petróleo, pino, salvia y marino) reservados para datos y estados;
+- títulos en *Cormorant Garamond* (frases cortas en minúsculas que terminan en punto), texto en *Manrope* y detalles técnicos en monoespaciada;
+- barra superior con la sección activa entre corchetes (`[ INICIO ]`) y cejas numeradas en cada página (`[01] INICIO`).
+
+Las fuentes están autoalojadas con `@fontsource` (no se llama a Google Fonts) y la paleta está en `tailwind.config.ts`.
+
 ## 2. De dónde salen los datos
 
 ### 2.1 Cifras oficiales (datos.gov.co)
