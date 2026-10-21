@@ -1,6 +1,6 @@
 {
   "name": "observatorio-desercion-ucc",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Observatorio de Deserción UCC - detecta a tiempo a los estudiantes que podrían retirarse, con datos reales y un agente de IA (Gemini)",
   "scripts": {
