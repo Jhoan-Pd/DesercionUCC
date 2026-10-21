@@ -10,7 +10,7 @@ export default function ErrorApp({ error, reset }: { error: Error & { digest?: s
         No pudimos cargar esta sección. Si el problema persiste, verifica la conexión con la base de datos o contacta al administrador.
         {error.digest && <span className="mt-1 block text-xs opacity-70">Código: {error.digest}</span>}
       </Alert>
-      <Button onClick={reset}>Reintentar</Button>
+      <Button onClick={reset}>Volver a intentar</Button>
     </div>
   );
 }
