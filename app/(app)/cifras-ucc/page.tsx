@@ -21,7 +21,8 @@ export default function CifrasUccPage() {
   return (
     <>
       <Encabezado
-        titulo="Cifras oficiales de la UCC Pasto"
+        seccion="/cifras-ucc"
+        titulo="la UCC Pasto en cifras."
         descripcion={
           <>
             Matrícula reportada por la universidad al Ministerio de Educación y publicada en datos.gov.co. Son cifras agregadas por programa, sexo y año; no contienen
@@ -30,17 +31,17 @@ export default function CifrasUccPage() {
         }
       />
 
-      <div className="grid gap-4 [&>*]:min-w-0 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0 sm:gap-5 xl:grid-cols-4">
         <Indicador etiqueta={`Matriculados en Pasto (${r.ultimo.anio})`} valor={n(r.ultimo.total)} nota={`${n(r.ultimo.pregrado)} en pregrado y ${n(r.ultimo.posgrado)} en posgrado`} />
         <Indicador etiqueta={`Cambio frente a ${r.primero.anio}`} valor={pct(r.variacionPasto)} nota={`${n(r.primero.total)} matriculados en ${r.primero.anio}`} />
         <Indicador etiqueta={`Cambio de toda la UCC (${r.nacional[0].anio}-${r.nacional[r.nacional.length - 1].anio})`} valor={pct(r.variacionNacional)} nota={`${n(r.nacional[r.nacional.length - 1].total)} matriculados en todas las sedes`} />
         <Indicador etiqueta={`Sede Pasto entre ${r.campus.length} sedes`} valor={`${r.posicionPasto}.ª`} nota={`por número de matriculados en ${r.anioCampus}`} />
       </div>
 
-      <div className="grid gap-4 [&>*]:min-w-0 xl:grid-cols-2">
+      <div className="grid gap-5 [&>*]:min-w-0 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Matriculados en la sede Pasto por año</CardTitle>
+            <CardTitle>matriculados en la sede Pasto por año.</CardTitle>
             <CardDescription>Primer semestre de cada año · todos los programas</CardDescription>
           </CardHeader>
           <CardContent>
@@ -50,7 +51,7 @@ export default function CifrasUccPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Matriculados por sede de la UCC ({r.anioCampus})</CardTitle>
+            <CardTitle>matriculados por sede de la UCC ({r.anioCampus}).</CardTitle>
             <CardDescription>Pasto resaltada</CardDescription>
           </CardHeader>
           <CardContent>
@@ -61,7 +62,7 @@ export default function CifrasUccPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Programas de la sede Pasto ({r.ultimo.anio})</CardTitle>
+          <CardTitle>programas de la sede Pasto ({r.ultimo.anio}).</CardTitle>
           <CardDescription>Matriculados por programa y su cambio frente a {r.primero.anio} (— = el programa no tenía matriculados ese año)</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 xl:grid-cols-2 [&>*]:min-w-0">
@@ -80,7 +81,7 @@ export default function CifrasUccPage() {
                 <TR key={p.programa}>
                   <TD>
                     <span className="font-medium">{p.programa}</span>
-                    <span className="block text-xs text-muted-foreground">
+                    <span className="block text-xs text-piedra">
                       {p.nivel} · {n(p.total)} matriculados
                     </span>
                   </TD>
@@ -96,7 +97,7 @@ export default function CifrasUccPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Programas activos en Pasto</CardTitle>
+          <CardTitle>programas activos en Pasto.</CardTitle>
           <CardDescription>Según el registro de programas del Ministerio de Educación</CardDescription>
         </CardHeader>
         <CardContent>
@@ -128,16 +129,17 @@ export default function CifrasUccPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Landmark className="h-4 w-4" aria-hidden /> Fuentes y depuración
+            <Landmark className="h-5 w-5 text-petroleo" aria-hidden /> fuentes y depuración.
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           {Object.values(r.fuentes).map((f) => (
             <div key={f.id} className="space-y-1">
-              <a href={f.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-primary hover:underline">
+              <a href={f.url} target="_blank" rel="noreferrer" className="enlace inline-flex items-center gap-1 font-semibold text-tinta">
                 {f.nombre} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
               </a>
-              <p className="text-muted-foreground">
+              <p className="meta">
+                {"// "}
                 {f.publica} · actualizado el {f.actualizado} · {f.licencia}
               </p>
               <p>
@@ -149,7 +151,7 @@ export default function CifrasUccPage() {
             </div>
           ))}
           <Alert variant="info">
-            {r.nota} Datos descargados el {r.descargadoEn}; se actualizan con <code className="rounded bg-secondary px-1">npm run datos:actualizar</code>.
+            {r.nota} Datos descargados el {r.descargadoEn}; se actualizan con <code className="rounded-sm bg-white/70 px-1 font-mono text-[13px]">npm run datos:actualizar</code>.
           </Alert>
         </CardContent>
       </Card>
