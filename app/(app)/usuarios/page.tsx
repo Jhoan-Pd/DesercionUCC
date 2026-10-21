@@ -13,7 +13,8 @@ export default async function UsuariosPage() {
   return (
     <>
       <Encabezado
-        titulo="Usuarios"
+        seccion="/usuarios"
+        titulo="quién tiene acceso."
         descripcion="Cuentas del personal autorizado. El Administrador carga los datos y gestiona las cuentas; Bienestar consulta el riesgo y usa el agente."
       />
       <GestorUsuarios usuarios={usuarios} actualId={session?.user.id ?? ""} />

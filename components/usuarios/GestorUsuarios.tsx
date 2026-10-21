@@ -53,41 +53,42 @@ export function GestorUsuarios({ usuarios, actualId }: { usuarios: UsuarioFila[]
       {mensaje && <Alert variant={mensaje.tipo}>{mensaje.texto}</Alert>}
 
       <form
-        className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-2 xl:grid-cols-[2fr_2fr_1fr_2fr_auto]"
+        className="grid gap-4 rounded-xl border bg-card p-6 md:grid-cols-2 xl:grid-cols-[2fr_2fr_1.5fr_2fr_auto]"
         onSubmit={async (e) => {
           e.preventDefault();
           const ok = await ejecutar(() => enviarJson("/api/usuarios", "POST", nuevo), `Cuenta creada para ${nuevo.email}. Comparte la contraseña por un canal seguro.`);
           if (ok) setNuevo({ nombre: "", email: "", rol: "BIENESTAR", password: "" });
         }}
       >
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Label htmlFor="nombre">Nombre</Label>
           <Input id="nombre" required minLength={3} value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Label htmlFor="email">Correo institucional</Label>
           <Input id="email" type="email" required value={nuevo.email} onChange={(e) => setNuevo({ ...nuevo, email: e.target.value })} />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Label htmlFor="rol">Rol</Label>
           <Select id="rol" value={nuevo.rol} onChange={(e) => setNuevo({ ...nuevo, rol: e.target.value as Rol })}>
             <option value="BIENESTAR">{ETIQUETA_ROL.BIENESTAR}</option>
             <option value="ADMIN">{ETIQUETA_ROL.ADMIN}</option>
           </Select>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Label htmlFor="password">Contraseña inicial</Label>
           <Input id="password" type="password" required minLength={8} autoComplete="new-password" value={nuevo.password} onChange={(e) => setNuevo({ ...nuevo, password: e.target.value })} />
           <p className="text-xs text-muted-foreground">Mínimo 8 caracteres, con letras y números.</p>
         </div>
         <div className="flex items-start pt-6">
           <Button type="submit" disabled={ocupado}>
-            <UserPlus className="h-4 w-4" aria-hidden /> Crear
+            <UserPlus className="h-4 w-4" aria-hidden /> Crear cuenta
           </Button>
         </div>
       </form>
 
-      <Table>
+      <div className="rounded-xl border bg-card px-3 py-2">
+        <Table>
         <THead>
           <TR>
             <TH>Usuario</TH>
@@ -105,7 +106,7 @@ export function GestorUsuarios({ usuarios, actualId }: { usuarios: UsuarioFila[]
                 <TD>
                   <span className="font-medium">{u.nombre}</span>
                   {soyYo && <span className="ml-1 text-xs text-muted-foreground">(tú)</span>}
-                  <span className="block text-xs text-muted-foreground">{u.email}</span>
+                  <span className="block font-mono text-[11px] text-piedra">{u.email}</span>
                 </TD>
                 <TD>
                   <Select
@@ -127,7 +128,7 @@ export function GestorUsuarios({ usuarios, actualId }: { usuarios: UsuarioFila[]
                     </Badge>
                   )}
                 </TD>
-                <TD className="text-sm text-muted-foreground">{u.ultimoAcceso ? new Date(u.ultimoAcceso).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" }) : "Nunca"}</TD>
+                <TD className="font-mono text-xs text-piedra">{u.ultimoAcceso ? new Date(u.ultimoAcceso).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" }) : "Nunca"}</TD>
                 <TD>
                   <div className="flex flex-wrap gap-2">
                     {!soyYo && (
@@ -167,7 +168,8 @@ export function GestorUsuarios({ usuarios, actualId }: { usuarios: UsuarioFila[]
             );
           })}
         </TBody>
-      </Table>
+        </Table>
+      </div>
     </div>
   );
 }
