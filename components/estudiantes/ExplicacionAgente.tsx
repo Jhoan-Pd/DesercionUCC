@@ -54,11 +54,12 @@ export function ExplicacionAgente({ codigo, inicial }: { codigo: string; inicial
       {resultado && !cargando && (
         <div className="space-y-3">
           {resultado.aviso && <Alert variant="warning">{resultado.aviso}</Alert>}
-          <div className="rounded-md bg-secondary/50 p-4">
+          <div className="rounded-lg border-l-2 border-petroleo bg-papel p-5">
             <TextoAgente texto={resultado.explicacion} />
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="meta">
+              {"// "}
               {resultado.origen === "IA"
                 ? `Redactado por ${resultado.modeloIa ?? "Gemini"}${resultado.explicadaEn ? ` el ${new Date(resultado.explicadaEn).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" })}` : ""}. Revísalo antes de actuar.`
                 : "Explicación calculada por el sistema (sin IA)."}

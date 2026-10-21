@@ -6,7 +6,7 @@ import { UMBRAL_ALTO, UMBRAL_MEDIO } from "@/services/riesgo/factores";
 export function MetodoRiesgo({ modelo }: { modelo: EstadoModelo }) {
   const auc = modelo.metricas?.auc;
   return (
-    <div className="flex gap-3 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+    <div className="flex gap-3 rounded-lg border border-bruma bg-[#EEF3F6] p-5 text-sm leading-relaxed text-marino">
       <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
       <div className="space-y-1">
         {modelo.metodo === "MODELO" ? (
@@ -26,7 +26,7 @@ export function MetodoRiesgo({ modelo }: { modelo: EstadoModelo }) {
               perdidas, asistencia, pagos pendientes, primeros semestres, Saber 11, trabajo y situación económica. Es una alerta de 0 a 100 (medio desde {UMBRAL_MEDIO}, alto
               desde {UMBRAL_ALTO}), no una probabilidad.
             </p>
-            <p className="text-sky-900/80">{modelo.motivo}</p>
+            <p className="meta text-marino/80">{"// "}{modelo.motivo}</p>
           </>
         )}
       </div>
