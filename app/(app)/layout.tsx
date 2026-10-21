@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { modulosParaRol } from "@/lib/modulos";
 import { puedeAcceder } from "@/lib/rbac";
-import { Sidebar } from "@/components/layout/Sidebar";
+import { Navegacion } from "@/components/layout/Navegacion";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +20,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen">
-      <Sidebar modulos={modulosParaRol(rol)} usuario={{ nombre: name ?? "Usuario", email: email ?? "", rol }} />
-      <div className="lg:pl-64">
-        <main className="mx-auto w-full max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">{children}</main>
-      </div>
+      <Navegacion modulos={modulosParaRol(rol)} usuario={{ nombre: name ?? "Usuario", email: email ?? "", rol }} />
+      <main className="mx-auto w-full max-w-[1200px] space-y-10 px-4 pb-20 pt-10 sm:px-6 sm:pt-14 lg:px-8">{children}</main>
+      <footer className="mx-auto max-w-[1200px] px-4 pb-10 sm:px-6 lg:px-8">
+        <p className="meta border-t pt-6">
+          {"// "}Universidad Cooperativa de Colombia · sede Pasto · datos tratados conforme a la Ley 1581 de 2012
+        </p>
+      </footer>
     </div>
   );
 }
