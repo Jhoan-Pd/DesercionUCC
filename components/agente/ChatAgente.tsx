@@ -64,14 +64,15 @@ export function ChatAgente() {
   }
 
   return (
-    <div className="flex min-h-[60vh] flex-col rounded-lg border bg-card shadow-sm">
-      <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6" aria-live="polite">
+    <div className="flex min-h-[60vh] flex-col rounded-xl border bg-card">
+      <div className="flex-1 space-y-5 overflow-y-auto p-5 sm:p-8" aria-live="polite">
         {mensajes.length === 0 && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Pregúntale al agente por los estudiantes en riesgo, los factores más frecuentes o las cifras oficiales de la UCC. Algunas ideas:</p>
+            <p className="meta">{"// algunas ideas para empezar"}</p>
+            <p className="max-w-2xl text-[15px] text-grafito">Pregúntale por los estudiantes en riesgo, los factores más frecuentes o las cifras oficiales de la UCC.</p>
             <div className="flex flex-wrap gap-2">
               {SUGERENCIAS.map((s) => (
-                <button key={s} type="button" onClick={() => enviar(s)} className="rounded-full border bg-background px-3 py-1.5 text-left text-sm hover:bg-secondary">
+                <button key={s} type="button" onClick={() => enviar(s)} className="rounded-sm border border-tinta/15 bg-papel px-3 py-2 text-left text-sm text-grafito transition-colors hover:border-tinta/40 hover:text-tinta">
                   {s}
                 </button>
               ))}
@@ -80,21 +81,21 @@ export function ChatAgente() {
         )}
         {mensajes.map((m, i) => (
           <div key={i} className={m.rol === "usuario" ? "flex justify-end" : "flex justify-start"}>
-            <div className={m.rol === "usuario" ? "max-w-[85%] rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground" : "w-full max-w-[90%] space-y-3 rounded-lg bg-secondary/60 px-4 py-3"}>
-              <p className="flex items-center gap-1.5 text-xs font-semibold opacity-80">
+            <div className={m.rol === "usuario" ? "max-w-[85%] rounded-lg bg-tinta px-4 py-3 text-sm text-white" : "w-full max-w-[90%] space-y-3 rounded-lg border-l-2 border-petroleo bg-papel px-5 py-4"}>
+              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-ceja opacity-75">
                 {m.rol === "usuario" ? <User className="h-3.5 w-3.5" aria-hidden /> : <Bot className="h-3.5 w-3.5" aria-hidden />}
                 {m.rol === "usuario" ? "Tú" : "Agente"}
               </p>
               {m.rol === "usuario" ? <p className="whitespace-pre-wrap">{m.texto}</p> : <TextoAgente texto={m.texto} />}
               {m.estudiantes && m.estudiantes.length > 0 && (
                 <div className="space-y-1 border-t pt-2">
-                  <p className="text-xs font-semibold text-muted-foreground">Estudiantes mencionados</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-ceja text-grafito">Estudiantes mencionados</p>
                   <ul className="flex flex-wrap gap-2">
                     {m.estudiantes.map((e) => (
                       <li key={e.codigo}>
-                        <Link href={`/estudiantes/${encodeURIComponent(e.codigo)}`} className="inline-flex items-center gap-2 rounded-md border bg-card px-2 py-1 text-xs hover:bg-secondary">
+                        <Link href={`/estudiantes/${encodeURIComponent(e.codigo)}`} className="inline-flex items-center gap-2 rounded-sm border bg-card px-2 py-1 text-xs hover:border-tinta/40">
                           <span className="font-medium">{e.nombre}</span>
-                          <span className="text-muted-foreground">{e.codigo}</span>
+                          <span className="font-mono text-[11px] text-piedra">{e.codigo}</span>
                           {e.nivel && <NivelBadge nivel={e.nivel} />}
                         </Link>
                       </li>
@@ -113,7 +114,7 @@ export function ChatAgente() {
         <div ref={finRef} />
       </div>
       <form
-        className="space-y-2 border-t p-3 sm:p-4"
+        className="space-y-2 border-t p-4 sm:p-5"
         onSubmit={(e) => {
           e.preventDefault();
           enviar(pregunta);
@@ -142,7 +143,7 @@ export function ChatAgente() {
             <Send className="h-4 w-4" aria-hidden />
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">El agente solo recibe datos académicos sin nombres. Sus respuestas son una ayuda: verifica en la ficha antes de actuar.</p>
+        <p className="meta">{"// "}El agente solo recibe datos académicos sin nombres. Sus respuestas son una ayuda: verifica en la ficha antes de actuar.</p>
       </form>
     </div>
   );
