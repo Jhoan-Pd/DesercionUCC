@@ -3,18 +3,9 @@ import { getServerSession, type Session } from "next-auth";
 import { ZodError, type ZodTypeAny, type z } from "zod";
 import { authOptions } from "@/lib/auth";
 import type { Rol } from "@/lib/roles";
+import { ErrorApi } from "@/lib/errores";
 
-/** Error controlado de la API: se traduce a una respuesta JSON con el código HTTP indicado */
-export class ErrorApi extends Error {
-  constructor(
-    public readonly estado: number,
-    mensaje: string,
-    public readonly detalles?: unknown,
-  ) {
-    super(mensaje);
-    this.name = "ErrorApi";
-  }
-}
+export { ErrorApi };
 
 interface Contexto {
   req: Request;

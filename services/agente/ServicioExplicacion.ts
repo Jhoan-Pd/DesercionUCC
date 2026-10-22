@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { ErrorApi } from "@/lib/api";
+import { ErrorApi } from "@/lib/errores";
 import { ClienteGemini, ErrorIA, textoDe } from "@/lib/ia/gemini";
 import { datosDe } from "@/services/riesgo/ServicioEvaluacion";
 import { factoresDe } from "@/services/estudiantes/ServicioEstudiantes";

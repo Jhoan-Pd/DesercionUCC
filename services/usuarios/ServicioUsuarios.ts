@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { ErrorApi } from "@/lib/api";
+import { ErrorApi } from "@/lib/errores";
 import type { ActualizarUsuario, CrearUsuario } from "@/lib/validators/usuarios";
 import { consultarBloqueo, ESTADO_LIMPIO } from "@/lib/seguridad/bloqueo";
 import { validarCambio } from "./reglas";
