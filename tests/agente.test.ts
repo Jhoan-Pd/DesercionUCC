@@ -51,6 +51,7 @@ describe("Cliente de Gemini", () => {
 describe("Agente con llamadas a funciones", () => {
   it("consulta las herramientas, devuelve el resultado a Gemini y responde con los códigos mencionados", async () => {
     const herramientas: Herramientas = {
+      declaraciones: DECLARACIONES,
       ejecutar: vi.fn().mockResolvedValue({ total: 1, estudiantes: [{ codigo: "A001", programa: "Derecho", nivel: "ALTO", puntaje: 70, factores: ["Promedio acumulado bajo"] }] }),
     };
     const fetchFalso = vi
@@ -74,7 +75,7 @@ describe("Agente con llamadas a funciones", () => {
   });
 
   it("si una herramienta falla, el agente recibe un error controlado y sigue", async () => {
-    const herramientas: Herramientas = { ejecutar: vi.fn().mockRejectedValue(new Error("BD caída")) };
+    const herramientas: Herramientas = { declaraciones: DECLARACIONES, ejecutar: vi.fn().mockRejectedValue(new Error("BD caída")) };
     const fetchFalso = vi.fn().mockResolvedValueOnce(candidato([{ functionCall: { name: "resumen_riesgo" } }])).mockResolvedValueOnce(candidato([{ text: "No pude consultar los datos." }]));
     const espiaConsola = vi.spyOn(console, "error").mockImplementation(() => {});
     const r = await new Agente(new ClienteGemini("K", "m", { fetch: fetchFalso }), herramientas).responder("resumen");

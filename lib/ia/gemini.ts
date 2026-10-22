@@ -24,18 +24,18 @@ export interface ContenidoGemini {
 
 /** Esquema de parámetros (subconjunto de OpenAPI que acepta Gemini) */
 export interface EsquemaGemini {
-  type: "OBJECT" | "STRING" | "INTEGER" | "NUMBER" | "BOOLEAN" | "ARRAY";
-  description?: string;
-  enum?: string[];
-  properties?: Record<string, EsquemaGemini>;
-  items?: EsquemaGemini;
-  required?: string[];
+  readonly type: "OBJECT" | "STRING" | "INTEGER" | "NUMBER" | "BOOLEAN" | "ARRAY";
+  readonly description?: string;
+  readonly enum?: readonly string[];
+  readonly properties?: Readonly<Record<string, EsquemaGemini>>;
+  readonly items?: EsquemaGemini;
+  readonly required?: readonly string[];
 }
 
 export interface DeclaracionFuncion {
-  name: string;
-  description: string;
-  parameters?: EsquemaGemini;
+  readonly name: string;
+  readonly description: string;
+  readonly parameters?: EsquemaGemini;
 }
 
 export class ErrorIA extends Error {
@@ -113,7 +113,7 @@ export class ClienteGemini {
     return elegirModelo(datos.models ?? []);
   }
 
-  async generar(params: { sistema: string; contenidos: ContenidoGemini[]; funciones?: DeclaracionFuncion[]; temperatura?: number }): Promise<ParteGemini[]> {
+  async generar(params: { sistema: string; contenidos: ContenidoGemini[]; funciones?: readonly DeclaracionFuncion[]; temperatura?: number }): Promise<ParteGemini[]> {
     const cuerpo = JSON.stringify({
       systemInstruction: { parts: [{ text: params.sistema }] },
       contents: params.contenidos,

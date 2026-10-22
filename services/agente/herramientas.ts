@@ -5,30 +5,36 @@ import { memorizar } from "@/lib/utils";
 import { ServicioEstudiantes } from "@/services/estudiantes/ServicioEstudiantes";
 import { factoresDe } from "@/services/riesgo/persistencia";
 import { esNivel } from "@/services/riesgo/niveles";
-import type { Herramientas } from "./declaraciones";
+import { DECLARACIONES, esNombreHerramienta, type Herramientas, type NombreHerramienta } from "./declaraciones";
 
 /**
  * Herramientas que el agente consulta: leen la información REAL del sistema (estudiantes cargados y
  * cifras oficiales). Ninguna devuelve nombres, documentos ni datos de contacto.
  */
 
+/** Función que atiende una herramienta con los argumentos que envía Gemini */
+type Ejecutor = (args: Record<string, unknown>) => Promise<Record<string, unknown>> | Record<string, unknown>;
+
 /** Implementación real sobre la base de datos */
 export class HerramientasBD implements Herramientas {
+  readonly declaraciones = DECLARACIONES;
+
+  /**
+   * Registro nombre -> ejecutor (patrón Command). Al ser un Record<NombreHerramienta, …>, TypeScript
+   * exige un ejecutor por cada herramienta declarada: no puede quedar una sin implementar.
+   */
+  private readonly ejecutores: Readonly<Record<NombreHerramienta, Ejecutor>> = {
+    resumen_riesgo: () => this.resumen(),
+    buscar_estudiantes: (args) => this.buscar(args),
+    detalle_estudiante: (args) => this.detalle(String(args.codigo ?? "")),
+    cifras_oficiales_ucc: () => this.cifras(),
+  };
+
   constructor(private readonly estudiantes: ServicioEstudiantes = new ServicioEstudiantes()) {}
 
   async ejecutar(nombre: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
-    switch (nombre) {
-      case "resumen_riesgo":
-        return this.resumen();
-      case "buscar_estudiantes":
-        return this.buscar(args);
-      case "detalle_estudiante":
-        return this.detalle(String(args.codigo ?? ""));
-      case "cifras_oficiales_ucc":
-        return this.cifras();
-      default:
-        return { error: `Herramienta desconocida: ${nombre}` };
-    }
+    if (!esNombreHerramienta(nombre)) return { error: `Herramienta desconocida: ${nombre}` };
+    return this.ejecutores[nombre](args);
   }
 
   private async resumen() {
