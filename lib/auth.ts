@@ -4,7 +4,8 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { esRol } from "@/lib/roles";
-import { ERROR_CUENTA_BLOQUEADA, ESTADO_LIMPIO, consultarBloqueo, registrarFallo } from "@/lib/seguridad/bloqueo";
+import { ERROR_CUENTA_BLOQUEADA, ESTADO_LIMPIO, consultarBloqueo } from "@/lib/seguridad/bloqueo";
+import { registrarIntentoFallido } from "@/lib/seguridad/intentos";
 import { revalidarSesion } from "@/lib/seguridad/sesion";
 
 const credencialesSchema = z.object({
@@ -44,8 +45,7 @@ export const authOptions: NextAuthOptions = {
 
         const coincide = await bcrypt.compare(parsed.data.password, usuario.passwordHash);
         if (!coincide || !esRol(usuario.rol)) {
-          const nuevo = registrarFallo(usuario);
-          await prisma.usuario.update({ where: { id: usuario.id }, data: nuevo });
+          const nuevo = await registrarIntentoFallido(prisma, usuario.id);
           if (nuevo.bloqueadoHasta) throw new Error(ERROR_CUENTA_BLOQUEADA);
           return null;
         }
