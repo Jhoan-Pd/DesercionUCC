@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bot, Send, User } from "lucide-react";
 import { enviarJson } from "@/lib/cliente-api";
+import { historialParaEnviar } from "@/lib/validators/agente";
 import type { RespuestaChat, EstudianteMencionado } from "@/services/agente/ServicioAgente";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,7 +40,7 @@ export function ChatAgente() {
   async function enviar(texto: string) {
     const limpia = texto.trim();
     if (!limpia || cargando) return;
-    const historial = mensajes.map(({ rol, texto }) => ({ rol, texto }));
+    const historial = historialParaEnviar(mensajes);
     setMensajes((m) => [...m, { rol: "usuario", texto: limpia }]);
     setPregunta("");
     setError(null);

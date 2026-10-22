@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { MAX_HISTORIAL, historialParaEnviar, preguntaAgenteSchema } from "@/lib/validators/agente";
 import { ClienteGemini, ErrorIA, elegirModelo, type ParteGemini } from "@/lib/ia/gemini";
 import { Agente, codigosMencionados, sistemaAgente } from "@/services/agente/Agente";
 import { accionesSugeridas, explicacionBasica, promptExplicacion, type EntradaExplicacion } from "@/services/agente/explicacion";
@@ -124,5 +125,15 @@ describe("Explicación del riesgo", () => {
   it("acciones sin repetir y como máximo 3", () => {
     expect(accionesSugeridas(entrada.factores)).toHaveLength(3);
     expect(new Set(accionesSugeridas([...entrada.factores, ...entrada.factores], 10)).size).toBe(3);
+  });
+});
+
+describe("historial del chat", () => {
+  it("una conversación larga sigue siendo válida: se envían los últimos mensajes y se recortan los largos", () => {
+    const mensajes = Array.from({ length: 30 }, (_, i) => ({ rol: (i % 2 ? "agente" : "usuario") as "usuario" | "agente", texto: `m${i} ` + "x".repeat(i === 29 ? 9000 : 10) }));
+    const historial = historialParaEnviar(mensajes);
+    expect(historial).toHaveLength(MAX_HISTORIAL);
+    expect(historial[0].texto.startsWith("m20")).toBe(true);
+    expect(preguntaAgenteSchema.safeParse({ pregunta: "¿y ahora?", historial }).success).toBe(true);
   });
 });

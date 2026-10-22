@@ -1,6 +1,7 @@
 import { ClienteGemini, ErrorIA, textoDe, type ContenidoGemini, type ParteGemini } from "@/lib/ia/gemini";
 import { formatoFechaLarga } from "@/lib/formato";
 import type { Herramientas } from "./declaraciones";
+import { MAX_HISTORIAL } from "@/lib/validators/agente";
 
 export interface MensajeChat {
   rol: "usuario" | "agente";
@@ -16,7 +17,7 @@ export interface RespuestaAgente {
 }
 
 export const MAX_RONDAS = 5;
-export const MAX_HISTORIAL = 10;
+export { MAX_HISTORIAL };
 
 export function sistemaAgente(hoy: Date = new Date()): string {
   return `Eres el agente del Observatorio de Deserción de la Universidad Cooperativa de Colombia (UCC), sede Pasto. Ayudas al equipo de Bienestar Universitario a identificar estudiantes que podrían retirarse y a decidir cómo acompañarlos. Hoy es ${formatoFechaLarga(hoy)}.
