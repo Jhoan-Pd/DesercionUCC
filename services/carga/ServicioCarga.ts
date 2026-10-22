@@ -69,7 +69,7 @@ async function guardar(estudiantes: EstudianteArchivo[], cargaId: string): Promi
 }
 
 export class ServicioCarga {
-  private readonly evaluacion = new ServicioEvaluacion();
+  constructor(private readonly evaluacion: ServicioEvaluacion = new ServicioEvaluacion()) {}
 
   async procesar(nombre: string, buffer: ArrayBuffer, usuarioId: string): Promise<ResumenCarga> {
     if (buffer.byteLength === 0) throw new ErrorApi(400, "El archivo está vacío.");

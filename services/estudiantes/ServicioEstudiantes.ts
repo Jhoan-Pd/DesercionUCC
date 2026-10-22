@@ -36,6 +36,8 @@ const MAX_FACTORES_FRECUENTES = 6;
 
 /** Consultas de estudiantes y del resumen de riesgo (solo estudiantes ACTIVOS cargados por el administrador) */
 export class ServicioEstudiantes {
+  constructor(private readonly evaluacion: ServicioEvaluacion = new ServicioEvaluacion()) {}
+
   async programas(): Promise<string[]> {
     const filas = await prisma.estudiante.findMany({ where: { estado: "ACTIVO" }, distinct: ["programa"], select: { programa: true }, orderBy: { programa: "asc" } });
     return filas.map((f) => f.programa);
@@ -130,7 +132,7 @@ export class ServicioEstudiantes {
         WHERE e."estado" = 'ACTIVO'
         GROUP BY e."programa", v."nivel"`,
       prisma.carga.findFirst({ orderBy: { creadaEn: "desc" }, include: { usuario: { select: { nombre: true } } } }),
-      new ServicioEvaluacion().estadoModelo(),
+      this.evaluacion.estadoModelo(),
       prisma.estudiante.groupBy({ by: ["estado"], _count: { _all: true } }),
       // Conteo en la base de datos: no hace falta traer el JSON de cada evaluación a memoria
       prisma.$queryRaw<{ etiqueta: string; n: number }[]>`
