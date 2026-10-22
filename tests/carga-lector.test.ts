@@ -87,4 +87,26 @@ describe("Excel", () => {
     expect(r.errores).toEqual([]);
     expect(r.estudiantes[0]).toMatchObject({ codigo: "B7", promedio: 2.9, trabaja: true, apoyoFinanciero: false, moraMatricula: true, semestre: 4 });
   });
+
+  it("una celda con formato de porcentaje se lee como se ve (85 %, no 0,85)", async () => {
+    const libro = new ExcelJS.Workbook();
+    const hoja = libro.addWorksheet("Estudiantes");
+    hoja.addRow(ENCABEZADOS_PLANTILLA);
+    const fila = hoja.addRow(["B8", "Ana Paz", "Derecho", 2, 3.8, 0, 0.855, 3, false, true, false, 310, 19, "activo", "2026-2"]);
+    fila.getCell(7).numFmt = "0.0%";
+    const r = validarTabla(await leerExcel((await libro.xlsx.writeBuffer()) as ArrayBuffer));
+    expect(r.estudiantes[0].asistencia).toBe(85.5);
+  });
+
+  it("lee miles de filas en tiempo lineal", async () => {
+    const libro = new ExcelJS.Workbook();
+    const hoja = libro.addWorksheet("Estudiantes");
+    hoja.addRow(ENCABEZADOS_PLANTILLA);
+    for (let i = 0; i < 5000; i++) hoja.addRow([`C${i}`, `Est ${i}`, "Derecho", 3, 3.5, 1, 85, 2, "no", "sí", "no", 300, 20, "activo", "2026-2"]);
+    const buffer = (await libro.xlsx.writeBuffer()) as ArrayBuffer;
+    const inicio = performance.now();
+    const tabla = await leerExcel(buffer);
+    expect(tabla.filas).toHaveLength(5000);
+    expect(performance.now() - inicio).toBeLessThan(5000); // antes: ~25 s (cuadrático)
+  });
 });
