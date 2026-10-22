@@ -143,6 +143,23 @@ function indexarColumnas(encabezados: string[]): { indice: IndiceColumnas; ignor
   return { indice, ignoradas };
 }
 
+function dentroDelRango(v: number, r: Rango): boolean {
+  return !Number.isNaN(v) && v >= r.min && v <= r.max && (!r.entero || Number.isInteger(v));
+}
+
+/**
+ * Revisa los valores numéricos con los MISMOS rangos que exige el archivo. La usa también el servicio
+ * gRPC, que recibe las variables sueltas (simulador): un solo lugar define qué es un dato válido.
+ */
+export function problemasDeRango(datos: Partial<Record<keyof EstudianteArchivo, unknown>>): string[] {
+  const problemas: string[] = [];
+  for (const c of COLUMNAS) {
+    const v = datos[c.campo];
+    if (c.rango && typeof v === "number" && !dentroDelRango(v, c.rango)) problemas.push(`${c.alias[0]} debe ser ${c.rango.texto}`);
+  }
+  return problemas;
+}
+
 /** Lee y valida una fila. Devuelve el estudiante y los problemas encontrados (si hay alguno, la fila se rechaza). */
 function leerFila(valores: string[], indice: IndiceColumnas): { estudiante: EstudianteArchivo; problemas: string[] } {
   const problemas: string[] = [];
@@ -154,7 +171,7 @@ function leerFila(valores: string[], indice: IndiceColumnas): { estudiante: Estu
     const v = leerNumero(celda(c));
     const r = POR_CAMPO.get(c)?.rango;
     if (v === null || !r) return v;
-    if (Number.isNaN(v) || v < r.min || v > r.max || (r.entero && !Number.isInteger(v))) {
+    if (!dentroDelRango(v, r)) {
       problemas.push(`${nombreColumna(c)} debe ser ${r.texto} (llegó "${celda(c)}")`);
       return null;
     }
