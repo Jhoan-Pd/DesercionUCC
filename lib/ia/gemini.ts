@@ -50,6 +50,11 @@ export class ErrorIA extends Error {
 
 export const MODELO_POR_DEFECTO = "gemini-flash-latest";
 const API = "https://generativelanguage.googleapis.com/v1beta";
+/** Tiempo máximo de espera por respuesta de Gemini (las rutas del agente tienen 60 s en total) */
+const TIEMPO_MAXIMO_MS = 30_000;
+const MAX_TOKENS_RESPUESTA = 2048;
+/** Temperatura baja: respuestas sobrias y apegadas a los datos */
+const TEMPERATURA_POR_DEFECTO = 0.2;
 
 type Fetch = typeof fetch;
 
@@ -91,7 +96,7 @@ export class ClienteGemini {
 
   private async llamar(url: string, init: RequestInit): Promise<Response> {
     const control = new AbortController();
-    const temporizador = setTimeout(() => control.abort(), 30_000);
+    const temporizador = setTimeout(() => control.abort(), TIEMPO_MAXIMO_MS);
     try {
       return await this.fetch(url, { ...init, signal: control.signal, headers: { "Content-Type": "application/json", "x-goog-api-key": this.apiKey, ...(init.headers ?? {}) } });
     } catch {
@@ -113,7 +118,7 @@ export class ClienteGemini {
       systemInstruction: { parts: [{ text: params.sistema }] },
       contents: params.contenidos,
       ...(params.funciones?.length ? { tools: [{ functionDeclarations: params.funciones }] } : {}),
-      generationConfig: { temperature: params.temperatura ?? 0.2, maxOutputTokens: 2048 },
+      generationConfig: { temperature: params.temperatura ?? TEMPERATURA_POR_DEFECTO, maxOutputTokens: MAX_TOKENS_RESPUESTA },
     });
 
     for (let intento = 0; intento < 2; intento++) {
@@ -145,8 +150,8 @@ async function errorDeRespuesta(r: Response): Promise<ErrorIA> {
   } catch {
     /* sin cuerpo */
   }
-  if (r.status === 400 && /API_KEY|INVALID_ARGUMENT/.test(detalle)) return new ErrorIA("La clave de Gemini (GEMINI_API_KEY) no es válida o le faltan permisos.", 502);
-  if (r.status === 401 || r.status === 403) return new ErrorIA("La clave de Gemini (GEMINI_API_KEY) no es válida o le faltan permisos.", 502);
+  const claveInvalida = r.status === 401 || r.status === 403 || (r.status === 400 && /API_KEY|INVALID_ARGUMENT/.test(detalle));
+  if (claveInvalida) return new ErrorIA("La clave de Gemini (GEMINI_API_KEY) no es válida o le faltan permisos.", 502);
   if (r.status === 429) return new ErrorIA("Se alcanzó el límite de consultas gratuitas de Gemini. Espera un minuto e inténtalo de nuevo.", 429);
   if (r.status === 404) return new ErrorIA("El modelo de Gemini configurado no existe. Revisa GEMINI_MODEL.", 502);
   return new ErrorIA(`Gemini respondió con un error (${r.status}). Intenta de nuevo en un momento.`, 502);
