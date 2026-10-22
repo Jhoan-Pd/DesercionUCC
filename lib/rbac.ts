@@ -27,11 +27,13 @@ export const REGLAS_RUTAS: { prefijo: string; roles: Rol[] }[] = [
 /** Prefijos que exigen sesión (los usa el matcher del middleware) */
 export const PREFIJOS_PROTEGIDOS = REGLAS_RUTAS.map((r) => r.prefijo);
 
+/** Reglas ordenadas una sola vez del prefijo más largo al más corto: la primera que coincide es la más específica */
+const REGLAS_POR_ESPECIFICIDAD = [...REGLAS_RUTAS].sort((a, b) => b.prefijo.length - a.prefijo.length);
+
 /** ¿Puede este rol abrir esta ruta? Rutas sin regla => solo requieren sesión. */
 export function puedeAcceder(pathname: string, rol: Rol): boolean {
-  const regla = REGLAS_RUTAS.filter((r) => pathname === r.prefijo || pathname.startsWith(`${r.prefijo}/`)).sort(
-    (a, b) => b.prefijo.length - a.prefijo.length,
-  )[0];
+  // El middleware llama esto en cada petición: un recorrido lineal, sin filtrar ni ordenar cada vez
+  const regla = REGLAS_POR_ESPECIFICIDAD.find((r) => pathname === r.prefijo || pathname.startsWith(`${r.prefijo}/`));
   return regla ? regla.roles.includes(rol) : true;
 }
 
