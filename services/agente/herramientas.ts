@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { resumenUccPasto } from "@/lib/datos-abiertos";
 import { claveNombre } from "@/lib/texto";
+import { memorizar } from "@/lib/utils";
 import { ServicioEstudiantes } from "@/services/estudiantes/ServicioEstudiantes";
 import { factoresDe } from "@/services/riesgo/persistencia";
 import { esNivel } from "@/services/riesgo/niveles";
@@ -13,6 +14,8 @@ import type { Herramientas } from "./declaraciones";
 
 /** Implementación real sobre la base de datos */
 export class HerramientasBD implements Herramientas {
+  constructor(private readonly estudiantes: ServicioEstudiantes = new ServicioEstudiantes()) {}
+
   async ejecutar(nombre: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
     switch (nombre) {
       case "resumen_riesgo":
@@ -29,7 +32,7 @@ export class HerramientasBD implements Herramientas {
   }
 
   private async resumen() {
-    const r = await new ServicioEstudiantes().resumen();
+    const r = await this.estudiantes.resumen();
     if (r.activos === 0) return { estudiantesActivos: 0, aviso: "No hay estudiantes cargados. El administrador debe subir el archivo de estudiantes en la página «Cargar datos»." };
     return {
       estudiantesActivos: r.activos,
@@ -51,20 +54,31 @@ export class HerramientasBD implements Herramientas {
     const factor = typeof args.factor === "string" ? claveNombre(args.factor) : "";
     const limite = Math.min(50, Math.max(1, Number(args.limite) || 15));
 
+    // El programa se compara sin tildes, algo que PostgreSQL no hace con ILIKE: se buscan primero los
+    // pocos programas que coinciden (uno por nombre distinto) y luego se filtra en la consulta con IN.
+    const programas = programa ? (await this.estudiantes.programas()).filter((p) => claveNombre(p).includes(programa)) : null;
+    if (programas?.length === 0) return { total: 0, mostrados: 0, estudiantes: [] };
+
     const filas = await prisma.estudiante.findMany({
-      where: { estado: "ACTIVO", evaluacion: nivel ? { nivel } : { isNot: null }, ...(semestreMax ? { semestre: { lte: semestreMax } } : {}) },
+      where: {
+        estado: "ACTIVO",
+        evaluacion: nivel ? { nivel } : { isNot: null },
+        ...(semestreMax ? { semestre: { lte: semestreMax } } : {}),
+        ...(programas ? { programa: { in: programas } } : {}),
+      },
       select: { codigo: true, programa: true, semestre: true, evaluacion: { select: { puntaje: true, nivel: true, factores: true } } },
       orderBy: { evaluacion: { puntaje: "desc" } },
     });
+    // Las etiquetas de factor se repiten mucho: se normaliza cada una una sola vez
+    const claveFactor = memorizar(claveNombre);
     const coincidencias = filas
-      .filter((e) => !programa || claveNombre(e.programa).includes(programa))
       .map((e) => ({ codigo: e.codigo, programa: e.programa, semestre: e.semestre, puntaje: e.evaluacion!.puntaje, nivel: e.evaluacion!.nivel, factores: factoresDe(e.evaluacion!.factores).map((f) => f.etiqueta) }))
-      .filter((e) => !factor || e.factores.some((f) => claveNombre(f).includes(factor)));
+      .filter((e) => !factor || e.factores.some((f) => claveFactor(f).includes(factor)));
     return { total: coincidencias.length, mostrados: Math.min(limite, coincidencias.length), estudiantes: coincidencias.slice(0, limite) };
   }
 
   private async detalle(codigo: string) {
-    const d = await new ServicioEstudiantes().detalle(codigo.trim());
+    const d = await this.estudiantes.detalle(codigo.trim());
     if (!d) return { error: `No existe un estudiante con el código ${codigo}.` };
     return {
       codigo: d.codigo,

@@ -13,3 +13,12 @@ export function sinVacios(parametros: Iterable<[string, string | undefined]>): R
   for (const [clave, valor] of parametros) if (valor !== undefined && valor !== "") r[clave] = valor;
   return r;
 }
+
+/** Guarda el resultado de una función de un argumento para no recalcularlo con el mismo valor */
+export function memorizar<A, R>(fn: (a: A) => R): (a: A) => R {
+  const cache = new Map<A, R>();
+  return (a) => {
+    if (!cache.has(a)) cache.set(a, fn(a));
+    return cache.get(a) as R;
+  };
+}
