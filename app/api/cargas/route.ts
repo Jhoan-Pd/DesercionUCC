@@ -17,7 +17,9 @@ export const GET = manejar(["ADMIN"], async () => ({ cargas: await servicio.hist
 export const POST = manejar(["ADMIN"], async ({ req, session }) => {
   // Se rechaza por el tamaño declarado ANTES de leer el formulario, que se guarda entero en memoria
   // (el margen cubre los separadores del multipart). El tamaño real se vuelve a revisar en el servicio.
-  const declarado = Number(req.headers.get("content-length") ?? 0);
+  const declarado = Number(req.headers.get("content-length"));
+  // Sin Content-Length (envío por partes) no se puede saber el tamaño antes de leerlo: se exige
+  if (!req.headers.get("content-length") || !Number.isFinite(declarado)) throw new ErrorApi(411, "Falta el tamaño del archivo en la petición. Súbelo desde la página «Cargar datos».");
   if (declarado > TAMANO_MAXIMO + MARGEN_MULTIPART) throw new ErrorApi(413, `El archivo supera los ${TAMANO_MAXIMO_MB} MB.`);
   let form: FormData;
   try {

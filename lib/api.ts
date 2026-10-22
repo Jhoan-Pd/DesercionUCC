@@ -5,8 +5,9 @@ import { authOptions } from "@/lib/auth";
 import type { Rol } from "@/lib/roles";
 import { ErrorApi } from "@/lib/errores";
 import { sinVacios } from "@/lib/utils";
+import { leerJson } from "@/lib/cuerpo";
 
-export { ErrorApi };
+export { ErrorApi, leerJson };
 
 interface Contexto {
   req: Request;
@@ -54,17 +55,6 @@ export function respuestaDeError(error: unknown): NextResponse {
   }
   console.error("[API] Error no controlado:", error);
   return NextResponse.json({ error: "Ocurrió un error inesperado. Intenta de nuevo más tarde." }, { status: 500 });
-}
-
-/** Valida el cuerpo JSON de la petición con un esquema Zod */
-export async function leerJson<T extends ZodTypeAny>(req: Request, esquema: T): Promise<z.infer<T>> {
-  let cuerpo: unknown;
-  try {
-    cuerpo = await req.json();
-  } catch {
-    throw new ErrorApi(400, "El cuerpo de la petición no es un JSON válido.");
-  }
-  return esquema.parse(cuerpo);
 }
 
 /** Valida los parámetros de la URL (query string) con un esquema Zod */
