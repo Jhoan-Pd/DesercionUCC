@@ -32,6 +32,8 @@ export interface FilaEstudiante {
   factores: string[];
 }
 
+const MAX_FACTORES_FRECUENTES = 6;
+
 /** Consultas de estudiantes y del resumen de riesgo (solo estudiantes ACTIVOS cargados por el administrador) */
 export class ServicioEstudiantes {
   async programas(): Promise<string[]> {
@@ -119,7 +121,7 @@ export class ServicioEstudiantes {
 
   /** Resumen para la página de inicio */
   async resumen() {
-    const [activos, porNivel, porProgramaNivel, ultimaCarga, estadoModelo, conResultado, factoresJson] = await Promise.all([
+    const [activos, porNivel, porProgramaNivel, ultimaCarga, estadoModelo, conResultado, factoresFrecuentes] = await Promise.all([
       prisma.estudiante.count({ where: { estado: "ACTIVO" } }),
       prisma.evaluacion.groupBy({ by: ["nivel"], _count: { _all: true } }),
       prisma.$queryRaw<{ programa: string; nivel: NivelRiesgo; n: bigint }[]>`
@@ -130,7 +132,15 @@ export class ServicioEstudiantes {
       prisma.carga.findFirst({ orderBy: { creadaEn: "desc" }, include: { usuario: { select: { nombre: true } } } }),
       new ServicioEvaluacion().estadoModelo(),
       prisma.estudiante.groupBy({ by: ["estado"], _count: { _all: true } }),
-      prisma.evaluacion.findMany({ where: { nivel: { in: ["ALTO", "MEDIO"] } }, select: { factores: true } }),
+      // Conteo en la base de datos: no hace falta traer el JSON de cada evaluación a memoria
+      prisma.$queryRaw<{ etiqueta: string; n: number }[]>`
+        SELECT f->>'etiqueta' AS "etiqueta", COUNT(*)::int AS "n"
+        FROM "evaluaciones" v
+        CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(v."factores") = 'array' THEN v."factores" ELSE '[]'::jsonb END) AS f
+        WHERE v."nivel" IN ('ALTO', 'MEDIO') AND f->>'etiqueta' IS NOT NULL
+        GROUP BY 1
+        ORDER BY "n" DESC, "etiqueta"
+        LIMIT ${MAX_FACTORES_FRECUENTES}`,
     ]);
 
     const nivel = { ALTO: 0, MEDIO: 0, BAJO: 0 } as Record<NivelRiesgo, number>;
@@ -144,17 +154,14 @@ export class ServicioEstudiantes {
       programas.set(r.programa, p);
     }
 
-    // Factores más frecuentes entre quienes tienen riesgo medio o alto
-    const frecuencia = new Map<string, number>();
-    for (const f of factoresJson) for (const x of factoresDe(f.factores)) frecuencia.set(x.etiqueta, (frecuencia.get(x.etiqueta) ?? 0) + 1);
-
     return {
       activos,
       nivel,
       programas: [...programas.entries()]
         .map(([programa, c]) => ({ programa, ...c }))
         .sort((a, b) => b.ALTO - a.ALTO || b.total - a.total),
-      factores: [...frecuencia.entries()].map(([etiqueta, n]) => ({ etiqueta, n })).sort((a, b) => b.n - a.n).slice(0, 6),
+      /** Factores más frecuentes entre quienes tienen riesgo medio o alto */
+      factores: factoresFrecuentes,
       conResultado: Object.fromEntries(conResultado.map((g) => [g.estado, g._count._all])) as Partial<Record<"ACTIVO" | "RETIRADO" | "GRADUADO", number>>,
       ultimaCarga: ultimaCarga ? { archivo: ultimaCarga.archivo, fecha: ultimaCarga.creadaEn.toISOString(), usuario: ultimaCarga.usuario.nombre } : null,
       modelo: estadoModelo,
