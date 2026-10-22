@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MAX_HISTORIAL, historialParaEnviar, preguntaAgenteSchema } from "@/lib/validators/agente";
-import { ClienteGemini, ErrorIA, elegirModelo, type ParteGemini } from "@/lib/ia/gemini";
+import { ClienteGemini, ErrorIA, elegirModelo, errorDeRespuesta, type ParteGemini } from "@/lib/ia/gemini";
 import { Agente, codigosMencionados, sistemaAgente } from "@/services/agente/Agente";
 import { accionesSugeridas, explicacionBasica, promptExplicacion, type EntradaExplicacion } from "@/services/agente/explicacion";
 import { DECLARACIONES, type Herramientas } from "@/services/agente/declaraciones";
@@ -135,5 +135,38 @@ describe("historial del chat", () => {
     expect(historial).toHaveLength(MAX_HISTORIAL);
     expect(historial[0].texto.startsWith("m20")).toBe(true);
     expect(preguntaAgenteSchema.safeParse({ pregunta: "¿y ahora?", historial }).success).toBe(true);
+  });
+});
+
+describe("Cliente de Gemini: fallas", () => {
+  const generar = (fetch: typeof globalThis.fetch, plazo?: number) =>
+    new ClienteGemini("clave", "gemini-flash-latest", { fetch }).generar({ sistema: "s", contenidos: [{ role: "user", parts: [{ text: "hola" }] }], plazo });
+
+  it("respeta el plazo total: sin tiempo restante no llama a Gemini", async () => {
+    const fetch = vi.fn();
+    await expect(generar(fetch as unknown as typeof globalThis.fetch, Date.now() - 1)).rejects.toMatchObject({ estado: 504 });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("un cuerpo que no termina de llegar se corta al vencer el plazo", async () => {
+    const lento = (async (_url: string, init?: RequestInit) =>
+      new Response(new ReadableStream({ start: (c) => init?.signal?.addEventListener("abort", () => c.error(new DOMException("abortado", "AbortError"))) }), { status: 200 })) as typeof globalThis.fetch;
+    await expect(generar(lento, Date.now() + 80)).rejects.toMatchObject({ estado: 504 });
+  });
+
+  it("una respuesta cortada por el límite de tokens no se toma como completa", async () => {
+    const f = (async () => respuesta({ candidates: [{ content: { parts: [{ text: "El estudiante tiene" }] }, finishReason: "MAX_TOKENS" }] })) as unknown as typeof globalThis.fetch;
+    await expect(generar(f)).rejects.toBeInstanceOf(ErrorIA);
+  });
+
+  it("un cuerpo que no es JSON es un ErrorIA (no un error 500)", async () => {
+    const f = (async () => new Response("<html>proxy</html>", { status: 200 })) as unknown as typeof globalThis.fetch;
+    await expect(generar(f)).rejects.toMatchObject({ estado: 502 });
+  });
+
+  it("solo culpa a la clave cuando Gemini lo dice", () => {
+    expect(errorDeRespuesta(400, { error: { status: "INVALID_ARGUMENT", message: "Request payload size exceeds the limit" } }).message).not.toContain("clave");
+    expect(errorDeRespuesta(400, { error: { status: "INVALID_ARGUMENT", details: [{ reason: "API_KEY_INVALID" }] } }).message).toContain("clave");
+    expect(errorDeRespuesta(403, null).message).toContain("clave");
   });
 });

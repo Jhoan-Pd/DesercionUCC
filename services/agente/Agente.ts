@@ -1,4 +1,4 @@
-import { ClienteGemini, ErrorIA, textoDe, type ContenidoGemini, type ParteGemini } from "@/lib/ia/gemini";
+import { ClienteGemini, ErrorIA, PLAZO_TOTAL_MS, textoDe, type ContenidoGemini, type ParteGemini } from "@/lib/ia/gemini";
 import { formatoFechaLarga } from "@/lib/formato";
 import type { Herramientas } from "./declaraciones";
 import { MAX_HISTORIAL } from "@/lib/validators/agente";
@@ -68,8 +68,10 @@ export class Agente {
 
     const usadas: string[] = [];
     const codigosVistos = new Set<string>();
+    // Un solo plazo para todas las rondas: con 6 rondas de hasta 30 s se pasaba del límite de la ruta
+    const plazo = Date.now() + PLAZO_TOTAL_MS;
     for (let ronda = 0; ronda <= MAX_RONDAS; ronda++) {
-      const partes = await this.cliente.generar({ sistema: sistemaAgente(), contenidos, funciones: ronda < MAX_RONDAS ? this.herramientas.declaraciones : undefined });
+      const partes = await this.cliente.generar({ sistema: sistemaAgente(), contenidos, funciones: ronda < MAX_RONDAS ? this.herramientas.declaraciones : undefined, plazo });
       const llamadas = partes.filter((p): p is ParteGemini & { functionCall: NonNullable<ParteGemini["functionCall"]> } => Boolean(p.functionCall));
       if (llamadas.length === 0) {
         const respuesta = textoDe(partes);
