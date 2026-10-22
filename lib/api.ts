@@ -4,6 +4,7 @@ import { ZodError, type ZodTypeAny, type z } from "zod";
 import { authOptions } from "@/lib/auth";
 import type { Rol } from "@/lib/roles";
 import { ErrorApi } from "@/lib/errores";
+import { sinVacios } from "@/lib/utils";
 
 export { ErrorApi };
 
@@ -68,10 +69,5 @@ export async function leerJson<T extends ZodTypeAny>(req: Request, esquema: T): 
 
 /** Valida los parámetros de la URL (query string) con un esquema Zod */
 export function leerQuery<T extends ZodTypeAny>(req: Request, esquema: T): z.infer<T> {
-  const { searchParams } = new URL(req.url);
-  const objeto: Record<string, string> = {};
-  searchParams.forEach((valor, clave) => {
-    if (valor !== "") objeto[clave] = valor;
-  });
-  return esquema.parse(objeto);
+  return esquema.parse(sinVacios(new URL(req.url).searchParams));
 }

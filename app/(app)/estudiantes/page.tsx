@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { Search } from "lucide-react";
 import { authOptions } from "@/lib/auth";
+import { sinVacios } from "@/lib/utils";
 import { filtrosEstudiantesSchema } from "@/lib/validators/estudiantes";
 import { ServicioEstudiantes } from "@/services/estudiantes/ServicioEstudiantes";
 import { Encabezado } from "@/components/comunes/Encabezado";
@@ -20,8 +21,7 @@ export const metadata = { title: "Estudiantes en riesgo" };
 export const dynamic = "force-dynamic";
 
 export default async function EstudiantesPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
-  const limpio = Object.fromEntries(Object.entries(searchParams).filter(([, v]) => v !== undefined && v !== "")) as Record<string, string>;
-  const parsed = filtrosEstudiantesSchema.safeParse(limpio);
+  const parsed = filtrosEstudiantesSchema.safeParse(sinVacios(Object.entries(searchParams)));
   const filtros = parsed.success ? parsed.data : {};
   const servicio = new ServicioEstudiantes();
   const [programas, lista] = await Promise.all([servicio.programas(), servicio.listar(filtros)]);
@@ -48,10 +48,12 @@ export default async function EstudiantesPage({ searchParams }: { searchParams: 
     );
   }
 
-  const params: Record<string, string> = {};
-  if (filtros.q) params.q = filtros.q;
-  if (filtros.programa) params.programa = filtros.programa;
-  if (filtros.nivel) params.nivel = filtros.nivel;
+  // Filtros vigentes para conservarlos al cambiar de página
+  const params = sinVacios([
+    ["q", filtros.q],
+    ["programa", filtros.programa],
+    ["nivel", filtros.nivel],
+  ]);
 
   return (
     <>
