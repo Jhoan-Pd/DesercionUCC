@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ErrorApi } from "@/lib/errores";
-import { ServicioEvaluacion } from "@/services/riesgo/ServicioEvaluacion";
+import { ServicioEvaluacion, type ClienteBD } from "@/services/riesgo/ServicioEvaluacion";
 import { leerExcel } from "./excel";
 import { validarTabla, type ErrorFila, type EstudianteArchivo, type ResultadoLectura } from "./lector";
 import { parsearCSV } from "./csv";
@@ -13,6 +13,20 @@ const LOTE = 500;
 /** Errores que se guardan y se devuelven (el total se informa aparte) */
 const MAX_ERRORES_GUARDADOS = 200;
 const MAX_LARGO_NOMBRE_ARCHIVO = 200;
+
+/** La carga de varios miles de estudiantes con su recálculo cabe holgada en el límite de 60 s de la ruta */
+const OPCIONES_TRANSACCION = { maxWait: 15_000, timeout: 50_000 };
+
+/** Identificador del bloqueo consultivo de PostgreSQL que serializa las cargas y el borrado total */
+const BLOQUEO_DATOS = 7_314_001;
+
+/**
+ * Bloqueo consultivo de transacción: si otra carga está en curso, esta espera a que termine.
+ * Se libera solo al confirmar o deshacer la transacción (sirve también detrás de PgBouncer/Neon).
+ */
+async function bloquearDatos(tx: ClienteBD): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${BLOQUEO_DATOS})`;
+}
 
 export interface ResumenCarga {
   archivo: string;
@@ -46,14 +60,14 @@ export async function leerArchivo(nombre: string, buffer: ArrayBuffer): Promise<
 }
 
 /** Inserta o actualiza por código en lotes con un solo INSERT ... ON CONFLICT (rápido incluso con miles de filas) */
-async function guardar(estudiantes: EstudianteArchivo[], cargaId: string): Promise<{ nuevos: number; actualizados: number }> {
+async function guardar(tx: ClienteBD, estudiantes: EstudianteArchivo[], cargaId: string): Promise<{ nuevos: number; actualizados: number }> {
   let nuevos = 0;
   for (let i = 0; i < estudiantes.length; i += LOTE) {
     const lote = estudiantes.slice(i, i + LOTE);
     const filas = lote.map(
       (e) => Prisma.sql`(${randomUUID()}, ${e.codigo}, ${e.nombre}, ${e.programa}, ${e.semestre}, ${e.promedio}, ${e.materiasPerdidas}, ${e.asistencia}, ${e.estrato}, ${e.trabaja}, ${e.apoyoFinanciero}, ${e.moraMatricula}, ${e.puntajeSaber11}, ${e.edad}, ${e.estado}::"EstadoEstudiante", ${e.periodo}, ${cargaId}, NOW(), NOW())`,
     );
-    const r = await prisma.$queryRaw<{ nuevo: boolean }[]>`
+    const r = await tx.$queryRaw<{ nuevo: boolean }[]>`
       INSERT INTO "estudiantes" ("id", "codigo", "nombre", "programa", "semestre", "promedio", "materiasPerdidas", "asistencia", "estrato", "trabaja", "apoyoFinanciero", "moraMatricula", "puntajeSaber11", "edad", "estado", "periodo", "cargaId", "creadoEn", "actualizadoEn")
       VALUES ${Prisma.join(filas)}
       ON CONFLICT ("codigo") DO UPDATE SET
@@ -84,15 +98,21 @@ export class ServicioCarga {
       return { ...base, nuevos: 0, actualizados: 0, modelo: { estado: "INSUFICIENTE", motivo: "No se cargó ningún estudiante." }, evaluados: 0 };
     }
 
-    const carga = await prisma.carga.create({
-      data: { archivo: nombre.slice(0, MAX_LARGO_NOMBRE_ARCHIVO), filas, nuevos: 0, actualizados: 0, errores: errores as unknown as Prisma.InputJsonValue, usuarioId },
-    });
-    const { nuevos, actualizados } = await guardar(lectura.estudiantes, carga.id);
-    await prisma.carga.update({ where: { id: carga.id }, data: { nuevos, actualizados } });
+    // Unidad de trabajo: guardar, entrenar y recalcular van en UNA transacción. Si algo falla a mitad
+    // de camino (un lote, el entrenamiento), no queda una carga a medias. El bloqueo consultivo hace que
+    // dos cargas simultáneas (o una carga y un borrado) se ejecuten una detrás de otra.
+    return prisma.$transaction(async (tx) => {
+      await bloquearDatos(tx);
+      const carga = await tx.carga.create({
+        data: { archivo: nombre.slice(0, MAX_LARGO_NOMBRE_ARCHIVO), filas, nuevos: 0, actualizados: 0, errores: errores as unknown as Prisma.InputJsonValue, usuarioId },
+      });
+      const { nuevos, actualizados } = await guardar(tx, lectura.estudiantes, carga.id);
+      await tx.carga.update({ where: { id: carga.id }, data: { nuevos, actualizados } });
 
-    const modelo = await this.evaluacion.entrenar();
-    const { evaluados } = await this.evaluacion.recalcular();
-    return { ...base, nuevos, actualizados, modelo, evaluados };
+      const modelo = await this.evaluacion.entrenar(tx);
+      const { evaluados } = await this.evaluacion.recalcular(tx);
+      return { ...base, nuevos, actualizados, modelo, evaluados };
+    }, OPCIONES_TRANSACCION);
   }
 
   async historial(limite = 20) {
@@ -111,12 +131,13 @@ export class ServicioCarga {
 
   /** Borra TODOS los estudiantes, sus evaluaciones, las cargas y los modelos (para empezar de cero) */
   async borrarTodo(): Promise<{ estudiantes: number }> {
-    const [, r] = await prisma.$transaction([
-      prisma.evaluacion.deleteMany(),
-      prisma.estudiante.deleteMany(),
-      prisma.carga.deleteMany(),
-      prisma.modeloRiesgo.deleteMany(),
-    ]);
-    return { estudiantes: r.count };
+    return prisma.$transaction(async (tx) => {
+      await bloquearDatos(tx);
+      await tx.evaluacion.deleteMany();
+      const r = await tx.estudiante.deleteMany();
+      await tx.carga.deleteMany();
+      await tx.modeloRiesgo.deleteMany();
+      return { estudiantes: r.count };
+    }, OPCIONES_TRANSACCION);
   }
 }

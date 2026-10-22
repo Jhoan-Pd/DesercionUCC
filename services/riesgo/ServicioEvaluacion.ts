@@ -25,13 +25,16 @@ function firma(r: Pick<Evaluacion, "puntaje" | "nivel" | "metodo" | "modeloVersi
 
 const LOTE = 1000;
 
+/** Cliente de Prisma o transacción en curso (los dos tienen las mismas consultas) */
+export type ClienteBD = Prisma.TransactionClient;
+
 /**
  * Calcula y guarda el riesgo de los estudiantes ACTIVOS. Si el resultado de un estudiante no cambió,
  * su evaluación (y la explicación ya redactada por el agente) se conserva tal cual.
  */
 export class ServicioEvaluacion {
-  async modeloActivo(): Promise<DefinicionModelo | null> {
-    const fila = await prisma.modeloRiesgo.findFirst({ where: { activo: true }, orderBy: { creadoEn: "desc" } });
+  async modeloActivo(db: ClienteBD = prisma): Promise<DefinicionModelo | null> {
+    const fila = await db.modeloRiesgo.findFirst({ where: { activo: true }, orderBy: { creadoEn: "desc" } });
     if (!fila) return null;
     const def = definicionModeloSchema.safeParse(fila.definicion);
     return def.success ? (def.data as DefinicionModelo) : null;
@@ -58,37 +61,33 @@ export class ServicioEvaluacion {
   /**
    * Entrena con los estudiantes RETIRADOS y GRADUADOS. Si el modelo pasa la evaluación se activa
    * (y desactiva los anteriores); si no pasa, se guarda inactivo para dejar constancia y se vuelve
-   * al puntaje por factores.
+   * al puntaje por factores. Recibe la transacción de la carga: o se guarda todo, o nada.
    */
-  async entrenar(fecha = new Date()): Promise<{ estado: "INSUFICIENTE" | "ACTIVADO" | "NO_ACTIVADO"; motivo: string }> {
-    const conResultado = await prisma.estudiante.findMany({ where: { estado: { in: ["RETIRADO", "GRADUADO"] } } });
+  async entrenar(tx: ClienteBD, fecha = new Date()): Promise<{ estado: "INSUFICIENTE" | "ACTIVADO" | "NO_ACTIVADO"; motivo: string }> {
+    const conResultado = await tx.estudiante.findMany({ where: { estado: { in: ["RETIRADO", "GRADUADO"] } } });
     const version = `ucc-${fecha.toISOString().slice(0, 19).replace(/[-:T]/g, "")}`;
     const r = entrenarModelo(
       conResultado.map((e) => ({ codigo: e.codigo, datos: datosDe(e), retirado: e.estado === "RETIRADO" })),
       version,
       fecha,
     );
-    if (r.estado === "INSUFICIENTE") {
-      await prisma.modeloRiesgo.updateMany({ where: { activo: true }, data: { activo: false } });
-      return { estado: "INSUFICIENTE", motivo: r.motivo };
-    }
-    await prisma.$transaction([
-      prisma.modeloRiesgo.updateMany({ where: { activo: true }, data: { activo: false } }),
-      prisma.modeloRiesgo.create({
-        data: {
-          version,
-          definicion: r.definicion as unknown as Prisma.InputJsonValue,
-          metricas: { ...r.metricas, motivo: r.motivo } as unknown as Prisma.InputJsonValue,
-          activo: r.activable,
-        },
-      }),
-    ]);
+    await tx.modeloRiesgo.updateMany({ where: { activo: true }, data: { activo: false } });
+    if (r.estado === "INSUFICIENTE") return { estado: "INSUFICIENTE", motivo: r.motivo };
+    await tx.modeloRiesgo.create({
+      data: {
+        version,
+        definicion: r.definicion as unknown as Prisma.InputJsonValue,
+        metricas: { ...r.metricas, motivo: r.motivo } as unknown as Prisma.InputJsonValue,
+        activo: r.activable,
+      },
+    });
     return { estado: r.activable ? "ACTIVADO" : "NO_ACTIVADO", motivo: r.motivo };
   }
 
-  async recalcular(): Promise<{ evaluados: number; cambiaron: number }> {
-    const calculadora = crearCalculadora(await this.modeloActivo());
-    const estudiantes = await prisma.estudiante.findMany({ where: { estado: "ACTIVO" }, include: { evaluacion: true } });
+  /** Recalcula el riesgo de los estudiantes activos dentro de la transacción recibida */
+  async recalcular(tx: ClienteBD): Promise<{ evaluados: number; cambiaron: number }> {
+    const calculadora = crearCalculadora(await this.modeloActivo(tx));
+    const estudiantes = await tx.estudiante.findMany({ where: { estado: "ACTIVO" }, include: { evaluacion: true } });
 
     const nuevas: Prisma.EvaluacionCreateManyInput[] = [];
     for (const e of estudiantes) {
@@ -106,10 +105,11 @@ export class ServicioEvaluacion {
     }
     for (let i = 0; i < nuevas.length; i += LOTE) {
       const lote = nuevas.slice(i, i + LOTE);
-      await prisma.$transaction([prisma.evaluacion.deleteMany({ where: { estudianteId: { in: lote.map((n) => n.estudianteId) } } }), prisma.evaluacion.createMany({ data: lote })]);
+      await tx.evaluacion.deleteMany({ where: { estudianteId: { in: lote.map((n) => n.estudianteId) } } });
+      await tx.evaluacion.createMany({ data: lote });
     }
     // Quien ya no está activo (retirado o graduado) no necesita alerta
-    await prisma.evaluacion.deleteMany({ where: { estudiante: { estado: { not: "ACTIVO" } } } });
+    await tx.evaluacion.deleteMany({ where: { estudiante: { estado: { not: "ACTIVO" } } } });
     return { evaluados: estudiantes.length, cambiaron: nuevas.length };
   }
 }
