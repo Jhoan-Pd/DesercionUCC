@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatoNumero } from "@/lib/formato";
 import { EntrenadorLogistico } from "./EntrenadorLogistico";
 import { calcularMetricas, esDePrueba } from "./metricas";
 import type { FactorRiesgo, NivelRiesgo, ResultadoRiesgo } from "./factores";
@@ -153,7 +154,7 @@ export function entrenarModelo(registros: RegistroConResultado[], version: strin
     variables,
     entrenadoEn: fecha.toISOString(),
   };
-  const aucTxt = Number.isFinite(m.auc) ? m.auc.toLocaleString("es-CO", { maximumFractionDigits: 3 }) : "sin calcular";
+  const aucTxt = Number.isFinite(m.auc) ? formatoNumero(m.auc, { max: 3 }) : "sin calcular";
   let activable = true;
   let motivo = `El modelo distingue bien a quienes se retiraron (AUC ${aucTxt} con estudiantes que no usó para aprender).`;
   if (!convergio) {
@@ -164,7 +165,7 @@ export function entrenarModelo(registros: RegistroConResultado[], version: strin
     motivo = "La muestra de prueba no tiene suficientes retirados y graduados para evaluar el modelo; se mantiene el puntaje por factores.";
   } else if (m.auc < AUC_MINIMO) {
     activable = false;
-    motivo = `El modelo no discrimina lo suficiente (AUC ${aucTxt} < ${AUC_MINIMO.toLocaleString("es-CO")}); se mantiene el puntaje por factores.`;
+    motivo = `El modelo no discrimina lo suficiente (AUC ${aucTxt} < ${formatoNumero(AUC_MINIMO)}); se mantiene el puntaje por factores.`;
   }
   return { estado: "ENTRENADO", activable, motivo, definicion: final.definicion, metricas };
 }

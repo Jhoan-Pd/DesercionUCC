@@ -1,5 +1,6 @@
 import { ExternalLink, Landmark } from "lucide-react";
 import { resumenUccPasto } from "@/lib/datos-abiertos";
+import { formatoNumero, formatoPorcentaje } from "@/lib/formato";
 import { Encabezado } from "@/components/comunes/Encabezado";
 import { Indicador } from "@/components/comunes/Indicador";
 import { GraficaBarras, GraficaColumnas } from "@/components/graficas/Graficas";
@@ -9,8 +10,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 export const metadata = { title: "Cifras oficiales UCC" };
 
-const pct = (v: number | null) => (v === null ? "—" : `${v > 0 ? "+" : ""}${(v * 100).toLocaleString("es-CO", { maximumFractionDigits: 1 })} %`);
-const n = (v: number) => v.toLocaleString("es-CO");
+const pct = (v: number | null) => (v === null ? "—" : formatoPorcentaje(v, { decimales: 1, signo: true }));
 
 /** Cifras oficiales y agregadas de la UCC (Ministerio de Educación, datos.gov.co). No hay datos individuales. */
 export default function CifrasUccPage() {
@@ -32,9 +32,9 @@ export default function CifrasUccPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0 sm:gap-5 xl:grid-cols-4">
-        <Indicador etiqueta={`Matriculados en Pasto (${r.ultimo.anio})`} valor={n(r.ultimo.total)} nota={`${n(r.ultimo.pregrado)} en pregrado y ${n(r.ultimo.posgrado)} en posgrado`} />
-        <Indicador etiqueta={`Cambio frente a ${r.primero.anio}`} valor={pct(r.variacionPasto)} nota={`${n(r.primero.total)} matriculados en ${r.primero.anio}`} />
-        <Indicador etiqueta={`Cambio de toda la UCC (${r.nacional[0].anio}-${r.nacional[r.nacional.length - 1].anio})`} valor={pct(r.variacionNacional)} nota={`${n(r.nacional[r.nacional.length - 1].total)} matriculados en todas las sedes`} />
+        <Indicador etiqueta={`Matriculados en Pasto (${r.ultimo.anio})`} valor={formatoNumero(r.ultimo.total)} nota={`${formatoNumero(r.ultimo.pregrado)} en pregrado y ${formatoNumero(r.ultimo.posgrado)} en posgrado`} />
+        <Indicador etiqueta={`Cambio frente a ${r.primero.anio}`} valor={pct(r.variacionPasto)} nota={`${formatoNumero(r.primero.total)} matriculados en ${r.primero.anio}`} />
+        <Indicador etiqueta={`Cambio de toda la UCC (${r.nacional[0].anio}-${r.nacional[r.nacional.length - 1].anio})`} valor={pct(r.variacionNacional)} nota={`${formatoNumero(r.nacional[r.nacional.length - 1].total)} matriculados en todas las sedes`} />
         <Indicador etiqueta={`Sede Pasto entre ${r.campus.length} sedes`} valor={`${r.posicionPasto}.ª`} nota={`por número de matriculados en ${r.anioCampus}`} />
       </div>
 
@@ -82,11 +82,11 @@ export default function CifrasUccPage() {
                   <TD>
                     <span className="font-medium">{p.programa}</span>
                     <span className="block text-xs text-piedra">
-                      {p.nivel} · {n(p.total)} matriculados
+                      {p.nivel} · {formatoNumero(p.total)} matriculados
                     </span>
                   </TD>
-                  <TD className="text-right tabular-nums">{n(p.mujeres)}</TD>
-                  <TD className="text-right tabular-nums">{n(p.hombres)}</TD>
+                  <TD className="text-right tabular-nums">{formatoNumero(p.mujeres)}</TD>
+                  <TD className="text-right tabular-nums">{formatoNumero(p.hombres)}</TD>
                   <TD className="whitespace-nowrap text-right tabular-nums">{p.totalInicial ? pct((p.total - p.totalInicial) / p.totalInicial) : "—"}</TD>
                 </TR>
               ))}

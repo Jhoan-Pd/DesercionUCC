@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { KeyRound, Lock, UserPlus } from "lucide-react";
 import { enviarJson } from "@/lib/cliente-api";
 import { ETIQUETA_ROL, type Rol } from "@/lib/roles";
+import { formatoFechaHora } from "@/lib/formato";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -128,7 +129,7 @@ export function GestorUsuarios({ usuarios, actualId }: { usuarios: UsuarioFila[]
                     </Badge>
                   )}
                 </TD>
-                <TD className="font-mono text-xs text-piedra">{u.ultimoAcceso ? new Date(u.ultimoAcceso).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" }) : "Nunca"}</TD>
+                <TD className="font-mono text-xs text-piedra">{u.ultimoAcceso ? formatoFechaHora(u.ultimoAcceso) : "Nunca"}</TD>
                 <TD>
                   <div className="flex flex-wrap gap-2">
                     {!soyYo && (

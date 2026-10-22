@@ -1,3 +1,5 @@
+import { formatoEntero, formatoNumero } from "@/lib/formato";
+
 /**
  * Variables del estudiante que se usan para estimar el riesgo de deserción.
  * Todas (menos el semestre) son opcionales: si el archivo de la universidad no trae un dato,
@@ -29,8 +31,8 @@ export interface DefinicionVariable {
   formato: (v: number | boolean) => string;
 }
 
-const nota = (v: number | boolean) => Number(v).toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
-const entero = (v: number | boolean) => Number(v).toLocaleString("es-CO", { maximumFractionDigits: 0 });
+const nota = (v: number | boolean) => formatoNumero(Number(v), { min: 1, max: 2 });
+const entero = (v: number | boolean) => formatoEntero(Number(v));
 const siNo = (v: number | boolean) => (v ? "Sí" : "No");
 
 /**

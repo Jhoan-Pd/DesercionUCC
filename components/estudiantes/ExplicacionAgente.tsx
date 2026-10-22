@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Bot, RefreshCw, Sparkles } from "lucide-react";
 import { enviarJson } from "@/lib/cliente-api";
+import { formatoFechaHora } from "@/lib/formato";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { TextoAgente } from "@/components/agente/TextoAgente";
@@ -61,7 +62,7 @@ export function ExplicacionAgente({ codigo, inicial }: { codigo: string; inicial
             <span className="meta">
               {"// "}
               {resultado.origen === "IA"
-                ? `Redactado por ${resultado.modeloIa ?? "Gemini"}${resultado.explicadaEn ? ` el ${new Date(resultado.explicadaEn).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" })}` : ""}. Revísalo antes de actuar.`
+                ? `Redactado por ${resultado.modeloIa ?? "Gemini"}${resultado.explicadaEn ? ` el ${formatoFechaHora(resultado.explicadaEn)}` : ""}. Revísalo antes de actuar.`
                 : "Explicación calculada por el sistema (sin IA)."}
             </span>
             <Button variant="outline" size="sm" onClick={() => pedir(true)}>

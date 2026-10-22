@@ -1,3 +1,4 @@
+import { formatoNumero } from "@/lib/formato";
 import { tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
 
 export type NivelRiesgo = "BAJO" | "MEDIO" | "ALTO";
@@ -39,7 +40,7 @@ interface Regla {
 const MEN_2016 = "MEN – SPADIES, «Factores determinantes de la deserción» (2016)";
 const ACADEMICO = "Indicador académico del periodo en curso (seguimiento institucional)";
 
-const n1 = (v: number) => v.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+const n1 = (v: number) => formatoNumero(v, { min: 1, max: 2 });
 
 /**
  * PUNTAJE POR FACTORES (se usa mientras no haya un modelo entrenado con estudiantes reales de la UCC).

@@ -1,4 +1,5 @@
 import { ClienteGemini, ErrorIA, textoDe, type ContenidoGemini, type ParteGemini } from "@/lib/ia/gemini";
+import { formatoFechaLarga } from "@/lib/formato";
 import { DECLARACIONES, type Herramientas } from "./declaraciones";
 
 export interface MensajeChat {
@@ -18,8 +19,7 @@ export const MAX_RONDAS = 5;
 export const MAX_HISTORIAL = 10;
 
 export function sistemaAgente(hoy: Date = new Date()): string {
-  const fecha = hoy.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric", timeZone: "America/Bogota" });
-  return `Eres el agente del Observatorio de Deserción de la Universidad Cooperativa de Colombia (UCC), sede Pasto. Ayudas al equipo de Bienestar Universitario a identificar estudiantes que podrían retirarse y a decidir cómo acompañarlos. Hoy es ${fecha}.
+  return `Eres el agente del Observatorio de Deserción de la Universidad Cooperativa de Colombia (UCC), sede Pasto. Ayudas al equipo de Bienestar Universitario a identificar estudiantes que podrían retirarse y a decidir cómo acompañarlos. Hoy es ${formatoFechaLarga(hoy)}.
 
 Reglas:
 - Consulta las herramientas antes de responder sobre estudiantes o cifras. Usa SOLO lo que ellas devuelven: nunca inventes estudiantes, cifras, porcentajes ni causas.

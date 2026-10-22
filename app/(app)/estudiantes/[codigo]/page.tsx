@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Bot } from "lucide-react";
 import { ServicioEstudiantes } from "@/services/estudiantes/ServicioEstudiantes";
 import { VARIABLES, tieneValor } from "@/services/riesgo/variables";
+import { formatoFecha } from "@/lib/formato";
 import { Encabezado } from "@/components/comunes/Encabezado";
 import { NivelBadge } from "@/components/estudiantes/NivelBadge";
 import { BarraPuntaje } from "@/components/estudiantes/BarraPuntaje";
@@ -106,7 +107,7 @@ export default async function FichaPage({ params }: { params: { codigo: string }
           <CardHeader>
             <CardTitle>datos del estudiante.</CardTitle>
             <CardDescription>
-              {e.cargadoDe ? `Del archivo «${e.cargadoDe.archivo}» (${new Date(e.cargadoDe.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })})` : "Cargado por el administrador"}
+              {e.cargadoDe ? `Del archivo «${e.cargadoDe.archivo}» (${formatoFecha(e.cargadoDe.fecha)})` : "Cargado por el administrador"}
             </CardDescription>
           </CardHeader>
           <CardContent>

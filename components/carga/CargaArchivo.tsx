@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileSpreadsheet, Upload } from "lucide-react";
+import { formatoEntero, formatoNumero } from "@/lib/formato";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 
@@ -18,7 +19,6 @@ interface Resumen {
   evaluados: number;
 }
 
-const n = (v: number) => v.toLocaleString("es-CO");
 
 /** Subida del archivo de estudiantes (.xlsx o .csv) y resumen del resultado */
 export function CargaArchivo() {
@@ -70,7 +70,7 @@ export function CargaArchivo() {
       >
         <FileSpreadsheet className="h-9 w-9 text-petroleo" aria-hidden />
         <span className="font-medium">{archivo ? archivo.name : "Arrastra aquí el archivo o haz clic para elegirlo"}</span>
-        <span className="meta">{archivo ? `${(archivo.size / 1024).toLocaleString("es-CO", { maximumFractionDigits: 0 })} KB` : "Excel (.xlsx) o CSV · máximo 5 MB"}</span>
+        <span className="meta">{archivo ? `${formatoEntero(archivo.size / 1024)} KB` : "Excel (.xlsx) o CSV · máximo 5 MB"}</span>
         <input ref={entrada} type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="sr-only" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} />
       </label>
 
@@ -84,7 +84,7 @@ export function CargaArchivo() {
         <div className="space-y-3">
           {resumen.nuevos + resumen.actualizados > 0 ? (
             <Alert variant="success" titulo={`Archivo «${resumen.archivo}» cargado`}>
-              {n(resumen.nuevos)} estudiantes nuevos y {n(resumen.actualizados)} actualizados. Se calculó el riesgo de {n(resumen.evaluados)} estudiantes activos.
+              {formatoNumero(resumen.nuevos)} estudiantes nuevos y {formatoNumero(resumen.actualizados)} actualizados. Se calculó el riesgo de {formatoNumero(resumen.evaluados)} estudiantes activos.
             </Alert>
           ) : (
             <Alert variant="error" titulo="No se cargó ningún estudiante">
@@ -100,7 +100,7 @@ export function CargaArchivo() {
           {resumen.totalErrores > 0 && (
             <div className="rounded-lg border border-riesgo-alto-borde">
               <p className="border-b border-riesgo-alto-borde bg-riesgo-alto-fondo px-4 py-2 text-sm font-semibold text-riesgo-alto">
-                {n(resumen.totalErrores)} filas no se cargaron{resumen.totalErrores > resumen.errores.length ? ` (se muestran las primeras ${resumen.errores.length})` : ""}
+                {formatoNumero(resumen.totalErrores)} filas no se cargaron{resumen.totalErrores > resumen.errores.length ? ` (se muestran las primeras ${resumen.errores.length})` : ""}
               </p>
               <ul className="max-h-64 divide-y overflow-y-auto text-sm">
                 {resumen.errores.map((e, i) => (
