@@ -103,7 +103,11 @@ function ajustar(registros: RegistroConResultado[], variables: ClaveVariable[], 
   return { definicion, convergio: ajuste.convergio };
 }
 
-export function probabilidad(def: DefinicionModelo, d: DatosEstudiante): { p: number; aportes: number[]; x: number[] } {
+/**
+ * Probabilidad estimada y aporte de cada variable al logit. Se devuelve también el logit: recalcularlo
+ * después como log(p / (1 - p)) da infinito cuando p se redondea a 1 (logit mayor que ~37).
+ */
+export function probabilidad(def: DefinicionModelo, d: DatosEstudiante): { p: number; logit: number; aportes: number[] } {
   const x = vectorizar(d, def.variables, def.medias);
   let logit = def.intercepto;
   const aportes = x.map((v, i) => {
@@ -112,7 +116,7 @@ export function probabilidad(def: DefinicionModelo, d: DatosEstudiante): { p: nu
     logit += a;
     return a;
   });
-  return { p: sigmoide(logit), aportes, x };
+  return { p: sigmoide(logit), logit, aportes };
 }
 
 export function entrenarModelo(registros: RegistroConResultado[], version: string, fecha = new Date()): ResultadoEntrenamiento {
@@ -189,8 +193,7 @@ export function decidirActivacion(m: Pick<MetricasModelo, "auc" | "positivos" | 
  * promedio, cada factor muestra cuánto subiría el riesgo frente al promedio en ese dato.
  */
 export function predecirConModelo(def: DefinicionModelo, d: DatosEstudiante): ResultadoRiesgo {
-  const { p, aportes } = probabilidad(def, d);
-  const logit = Math.log(p / (1 - p));
+  const { p, logit, aportes } = probabilidad(def, d);
   const pPromedio = sigmoide(def.intercepto);
   const faltantes = def.variables.filter((v) => !tieneValor(d[v]));
   const positivos = def.variables.map((v, i) => (tieneValor(d[v]) && aportes[i] > 0 ? aportes[i] : 0));

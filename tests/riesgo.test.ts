@@ -123,3 +123,13 @@ describe("regla de activación del modelo", () => {
     expect(decidirActivacion({ auc: 0.65, positivos: 20, n: 80 }, true).motivo).toContain("0,65 < 0,7");
   });
 });
+
+describe("estabilidad numérica del modelo", () => {
+  it("con un logit enorme la probabilidad es 1 y los factores siguen siendo números", () => {
+    const def = { version: "t", variables: ["promedio"] as const, medias: [3.5], desviaciones: [0.1], coeficientes: [-30], intercepto: 0, tasaBase: 0.3, umbrales: { medio: 0.3, alto: 0.6 } };
+    const r = predecirConModelo({ ...def, variables: [...def.variables] }, { semestre: 3, promedio: 2 });
+    expect(r.puntaje).toBe(100);
+    expect(r.nivel).toBe("ALTO");
+    expect(r.factores.every((f) => Number.isFinite(f.puntos))).toBe(true);
+  });
+});
