@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { KeyRound, Lock, UserPlus } from "lucide-react";
 import { enviarJson } from "@/lib/cliente-api";
 import { ETIQUETA_ROL, type Rol } from "@/lib/roles";
+import type { UsuarioFila } from "@/services/usuarios/ServicioUsuarios";
 import { formatoFechaHora } from "@/lib/formato";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,16 +14,6 @@ import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-
-export interface UsuarioFila {
-  id: string;
-  nombre: string;
-  email: string;
-  rol: Rol;
-  activo: boolean;
-  bloqueado: boolean;
-  ultimoAcceso: string | null;
-}
 
 export function GestorUsuarios({ usuarios, actualId }: { usuarios: UsuarioFila[]; actualId: string }) {
   const router = useRouter();

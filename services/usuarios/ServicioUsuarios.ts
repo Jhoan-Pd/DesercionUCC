@@ -3,10 +3,22 @@ import { prisma } from "@/lib/prisma";
 import { ErrorApi } from "@/lib/errores";
 import type { ActualizarUsuario, CrearUsuario } from "@/lib/validators/usuarios";
 import { consultarBloqueo, ESTADO_LIMPIO } from "@/lib/seguridad/bloqueo";
+import type { Rol } from "@/lib/roles";
 import { validarCambio } from "./reglas";
 
+/** Cuenta tal como se muestra en la página de usuarios (sin el hash de la contraseña) */
+export interface UsuarioFila {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: Rol;
+  activo: boolean;
+  bloqueado: boolean;
+  ultimoAcceso: string | null;
+}
+
 export class ServicioUsuarios {
-  async listar() {
+  async listar(): Promise<UsuarioFila[]> {
     const usuarios = await prisma.usuario.findMany({ orderBy: [{ activo: "desc" }, { rol: "asc" }, { nombre: "asc" }] });
     return usuarios.map((u) => ({
       id: u.id,

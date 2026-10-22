@@ -4,17 +4,10 @@ import { useState } from "react";
 import { Bot, RefreshCw, Sparkles } from "lucide-react";
 import { enviarJson } from "@/lib/cliente-api";
 import { formatoFechaHora } from "@/lib/formato";
+import type { ResultadoExplicacion as Resultado } from "@/services/agente/ServicioExplicacion";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { TextoAgente } from "@/components/agente/TextoAgente";
-
-interface Resultado {
-  explicacion: string;
-  origen: "IA" | "BASICA";
-  modeloIa: string | null;
-  explicadaEn: string | null;
-  aviso: string | null;
-}
 
 /** Explicación del riesgo redactada por el agente de IA (se genera a pedido y queda guardada) */
 export function ExplicacionAgente({ codigo, inicial }: { codigo: string; inicial: { explicacion: string; modeloIa: string | null; explicadaEn: string | null } | null }) {
