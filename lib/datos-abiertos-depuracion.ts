@@ -1,4 +1,5 @@
 import type { FilaMatricula, FilaPrograma } from "./datos-abiertos";
+import { claveNombre } from "./texto";
 
 /**
  * Filtro y depuración de los conjuntos del Ministerio de Educación en datos.gov.co.
@@ -41,7 +42,7 @@ export interface FilaProgramaMen {
 }
 
 export function esUcc(nombreInstitucion: string | undefined): boolean {
-  return (nombreInstitucion ?? "").toUpperCase().replace(/\s+/g, " ").trim() === NOMBRE_UCC;
+  return claveNombre(nombreInstitucion ?? "") === NOMBRE_UCC;
 }
 
 function claveRegistro(f: FilaMatriculaMen): string {
