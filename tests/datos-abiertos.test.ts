@@ -116,3 +116,10 @@ describe("Resumen de las cifras oficiales (datos reales incluidos en el reposito
     expect(variacion(0, 5)).toBeNull();
   });
 });
+
+describe("resumen en caché", () => {
+  it("el resumen de los datos del repositorio se calcula una sola vez", () => {
+    expect(resumenUccPasto()).toBe(resumenUccPasto());
+    expect(resumenUccPasto({ ...DATOS_UCC })).not.toBe(resumenUccPasto());
+  });
+});

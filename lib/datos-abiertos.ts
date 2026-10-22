@@ -99,8 +99,8 @@ export interface MatriculaPrograma {
  * códigos SNIES, p. ej. Ingeniería Industrial 9107 y 107062 tras renovar el registro).
  */
 export function matriculaPorPrograma(filas: FilaMatricula[], anio: number): MatriculaPrograma[] {
-  const anios = [...new Set(filas.map((f) => Number(f[0])))].sort((a, b) => a - b);
-  const primero = anios[0];
+  // Primer año con datos: un mínimo en O(n), sin armar ni ordenar la lista de años
+  const primero = filas.reduce((min, f) => Math.min(min, Number(f[0])), Infinity);
   const grupos = new Map<string, { variantes: Set<string>; nivel: MatriculaPrograma["nivel"]; total: number; hombres: number; mujeres: number; inicial: number }>();
   for (const [a, , , programa, , sexo, nivel, , n] of filas) {
     const clave = claveNombre(programa);
@@ -158,7 +158,16 @@ export function variacion(inicial: number, final: number): number | null {
 }
 
 /** Resumen listo para la página "Cifras oficiales" */
-export function resumenUccPasto(d: DatosAbiertosUcc = DATOS_UCC) {
+export function resumenUccPasto(d: DatosAbiertosUcc = DATOS_UCC): ResumenUccPasto {
+  // Los datos abiertos vienen de un archivo que no cambia mientras corre el servidor: el resumen
+  // de DATOS_UCC se calcula una sola vez y se reutiliza en cada visita y en cada consulta del agente.
+  if (d === DATOS_UCC) return (resumenCacheado ??= calcularResumen(d));
+  return calcularResumen(d);
+}
+
+let resumenCacheado: ResumenUccPasto | undefined;
+
+function calcularResumen(d: DatosAbiertosUcc) {
   const porAnio = matriculaPorAnio(d.matriculaPasto);
   const ultimo = porAnio[porAnio.length - 1];
   const primero = porAnio[0];
@@ -185,4 +194,4 @@ export function resumenUccPasto(d: DatosAbiertosUcc = DATOS_UCC) {
   };
 }
 
-export type ResumenUccPasto = ReturnType<typeof resumenUccPasto>;
+export type ResumenUccPasto = ReturnType<typeof calcularResumen>;
