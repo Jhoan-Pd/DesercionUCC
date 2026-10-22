@@ -1,9 +1,9 @@
 import type { NivelRiesgo, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import type { FactorRiesgo } from "@/services/riesgo/factores";
 import { FUENTE_REGLA } from "@/services/riesgo/factores";
-import { ServicioEvaluacion, datosDe } from "@/services/riesgo/ServicioEvaluacion";
-import type { ClaveVariable } from "@/services/riesgo/variables";
+import { factoresDe, faltantesDe } from "@/services/riesgo/persistencia";
+import { ServicioEvaluacion } from "@/services/riesgo/ServicioEvaluacion";
+import { datosDe } from "@/services/riesgo/variables";
 
 export interface FiltrosEstudiantes {
   q?: string;
@@ -21,10 +21,6 @@ export interface FilaEstudiante {
   puntaje: number | null;
   nivel: NivelRiesgo | null;
   factores: string[];
-}
-
-export function factoresDe(json: Prisma.JsonValue | undefined | null): FactorRiesgo[] {
-  return Array.isArray(json) ? (json as unknown as FactorRiesgo[]) : [];
 }
 
 /** Consultas de estudiantes y del resumen de riesgo (solo estudiantes ACTIVOS cargados por el administrador) */
@@ -88,7 +84,7 @@ export class ServicioEstudiantes {
             metodo: ev.metodo as "FACTORES" | "MODELO",
             modeloVersion: ev.modeloVersion,
             factores: factoresDe(ev.factores).map((f) => ({ ...f, fuente: ev.metodo === "FACTORES" ? FUENTE_REGLA[f.clave] ?? null : null })),
-            faltantes: ev.faltantes as ClaveVariable[],
+            faltantes: faltantesDe(ev.faltantes),
             calculadoEn: ev.calculadoEn.toISOString(),
             explicacion: ev.explicacion,
             explicadaEn: ev.explicadaEn?.toISOString() ?? null,

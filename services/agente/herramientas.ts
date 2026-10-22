@@ -2,7 +2,8 @@ import type { NivelRiesgo } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { resumenUccPasto } from "@/lib/datos-abiertos";
 import { claveNombre } from "@/lib/texto";
-import { ServicioEstudiantes, factoresDe } from "@/services/estudiantes/ServicioEstudiantes";
+import { ServicioEstudiantes } from "@/services/estudiantes/ServicioEstudiantes";
+import { factoresDe } from "@/services/riesgo/persistencia";
 import type { Herramientas } from "./declaraciones";
 
 /**

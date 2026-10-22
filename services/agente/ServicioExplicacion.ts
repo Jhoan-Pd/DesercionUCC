@@ -1,9 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { ErrorApi } from "@/lib/errores";
 import { ClienteGemini, ErrorIA, textoDe } from "@/lib/ia/gemini";
-import { datosDe } from "@/services/riesgo/ServicioEvaluacion";
-import { factoresDe } from "@/services/estudiantes/ServicioEstudiantes";
-import type { ClaveVariable } from "@/services/riesgo/variables";
+import { factoresDe, faltantesDe } from "@/services/riesgo/persistencia";
+import { datosDe } from "@/services/riesgo/variables";
 import { SISTEMA_EXPLICACION, explicacionBasica, promptExplicacion, type EntradaExplicacion } from "./explicacion";
 
 export interface ResultadoExplicacion {
@@ -41,7 +40,7 @@ export class ServicioExplicacion {
       nivel: ev.nivel,
       metodo: ev.metodo === "MODELO" ? "MODELO" : "FACTORES",
       factores: factoresDe(ev.factores),
-      faltantes: ev.faltantes as ClaveVariable[],
+      faltantes: faltantesDe(ev.faltantes),
     };
     const basica = (aviso: string): ResultadoExplicacion => ({ explicacion: explicacionBasica(entrada), origen: "BASICA", modeloIa: null, explicadaEn: null, aviso });
 

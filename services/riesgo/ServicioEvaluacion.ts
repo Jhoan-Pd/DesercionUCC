@@ -1,8 +1,9 @@
-import type { Estudiante, Evaluacion, Prisma } from "@prisma/client";
+import type { Evaluacion, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { puntajePorFactores, type FactorRiesgo, type ResultadoRiesgo } from "./factores";
+import { puntajePorFactores, type ResultadoRiesgo } from "./factores";
 import { definicionModeloSchema, entrenarModelo, predecirConModelo, MINIMO_ENTRENAMIENTO, type DefinicionModelo, type MetricasEntrenamiento } from "./modelo";
-import type { DatosEstudiante } from "./variables";
+import { factoresDe } from "./persistencia";
+import { datosDe, type DatosEstudiante } from "./variables";
 
 export interface EstadoModelo {
   /** Método con el que se calcula hoy el riesgo */
@@ -15,21 +16,6 @@ export interface EstadoModelo {
   minimo: number;
 }
 
-export function datosDe(e: Pick<Estudiante, "semestre" | "promedio" | "materiasPerdidas" | "asistencia" | "estrato" | "trabaja" | "apoyoFinanciero" | "moraMatricula" | "puntajeSaber11" | "edad">): DatosEstudiante {
-  return {
-    semestre: e.semestre,
-    promedio: e.promedio,
-    materiasPerdidas: e.materiasPerdidas,
-    asistencia: e.asistencia,
-    estrato: e.estrato,
-    trabaja: e.trabaja,
-    apoyoFinanciero: e.apoyoFinanciero,
-    moraMatricula: e.moraMatricula,
-    puntajeSaber11: e.puntajeSaber11,
-    edad: e.edad,
-  };
-}
-
 /** Calcula el riesgo con el modelo activo si existe; si no, con el puntaje por factores */
 export function evaluar(datos: DatosEstudiante, modelo: DefinicionModelo | null): ResultadoRiesgo {
   return modelo ? predecirConModelo(modelo, datos) : puntajePorFactores(datos);
@@ -37,7 +23,7 @@ export function evaluar(datos: DatosEstudiante, modelo: DefinicionModelo | null)
 
 /** Firma comparable de un resultado (JSONB no conserva el orden de las claves, por eso se arma a mano) */
 function firma(r: Pick<Evaluacion, "puntaje" | "nivel" | "metodo" | "modeloVersion" | "factores" | "faltantes"> | ResultadoRiesgo): string {
-  const factores = (Array.isArray(r.factores) ? (r.factores as unknown as FactorRiesgo[]) : []).map((f) => [f.clave, f.etiqueta, f.puntos, f.detalle]);
+  const factores = factoresDe(r.factores).map((f) => [f.clave, f.etiqueta, f.puntos, f.detalle]);
   return JSON.stringify([r.puntaje, r.nivel, r.metodo, r.modeloVersion ?? null, factores, [...r.faltantes].sort()]);
 }
 
