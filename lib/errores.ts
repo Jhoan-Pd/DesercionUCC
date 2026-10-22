@@ -13,3 +13,11 @@ export class ErrorApi extends Error {
     this.name = "ErrorApi";
   }
 }
+
+/**
+ * ¿El error es una violación de una restricción UNIQUE (código P2002 de Prisma)?
+ * Se revisa el código y no la clase, porque la clase cambia según el motor de Prisma que se use.
+ */
+export function esViolacionDeUnicidad(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002";
+}

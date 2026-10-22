@@ -1,8 +1,8 @@
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { ErrorApi } from "@/lib/errores";
+import { ErrorApi, esViolacionDeUnicidad } from "@/lib/errores";
 import type { ActualizarUsuario, CrearUsuario } from "@/lib/validators/usuarios";
 import { consultarBloqueo, ESTADO_LIMPIO } from "@/lib/seguridad/bloqueo";
+import { cifrarContrasena } from "@/lib/seguridad/contrasenas";
 import type { Rol } from "@/lib/roles";
 import { validarCambio } from "./reglas";
 
@@ -32,11 +32,17 @@ export class ServicioUsuarios {
   }
 
   async crear(datos: CrearUsuario) {
-    if (await prisma.usuario.findUnique({ where: { email: datos.email } })) throw new ErrorApi(409, "Ya existe una cuenta con ese correo.");
-    const u = await prisma.usuario.create({
-      data: { nombre: datos.nombre, email: datos.email, rol: datos.rol, passwordHash: await bcrypt.hash(datos.password, 10) },
-    });
-    return { id: u.id };
+    // La restricción UNIQUE del correo decide: consultar primero y crear después dejaba una carrera
+    // entre dos administradores que crean la misma cuenta al tiempo (el segundo recibía un error 500).
+    try {
+      const u = await prisma.usuario.create({
+        data: { nombre: datos.nombre, email: datos.email, rol: datos.rol, passwordHash: await cifrarContrasena(datos.password) },
+      });
+      return { id: u.id };
+    } catch (e) {
+      if (esViolacionDeUnicidad(e)) throw new ErrorApi(409, "Ya existe una cuenta con ese correo.");
+      throw e;
+    }
   }
 
   async actualizar(id: string, cambio: ActualizarUsuario, actorId: string) {
@@ -51,7 +57,7 @@ export class ServicioUsuarios {
         ...(cambio.nombre ? { nombre: cambio.nombre } : {}),
         ...(cambio.rol ? { rol: cambio.rol } : {}),
         ...(cambio.activo !== undefined ? { activo: cambio.activo } : {}),
-        ...(cambio.password ? { passwordHash: await bcrypt.hash(cambio.password, 10), ...ESTADO_LIMPIO } : {}),
+        ...(cambio.password ? { passwordHash: await cifrarContrasena(cambio.password), ...ESTADO_LIMPIO } : {}),
         ...(cambio.desbloquear ? ESTADO_LIMPIO : {}),
       },
     });
