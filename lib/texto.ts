@@ -35,3 +35,11 @@ export function formatoTitulo(nombre: string): string {
     .map((palabra, i) => (i > 0 && PALABRAS_MENORES.has(palabra) ? palabra : palabra.charAt(0).toUpperCase() + palabra.slice(1)))
     .join(" ");
 }
+
+/** Caracteres de control (tabulador, retorno, nulo…): se cambian por un espacio en los textos libres */
+const CONTROLES = /[\u0000-\u001f\u007f]/g;
+
+/** Texto libre de un archivo en una sola línea: sin caracteres de control ni espacios repetidos */
+export function textoLimpio(texto: string): string {
+  return texto.replace(CONTROLES, " ").replace(/\s+/g, " ").trim();
+}

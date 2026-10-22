@@ -1,4 +1,5 @@
-import { formatoTitulo, normalizarValor } from "@/lib/texto";
+import { formatoTitulo, normalizarValor, textoLimpio } from "@/lib/texto";
+import { LARGO_MAXIMO } from "./limites";
 import { normalizarEncabezado, parsearCSV, type TablaCSV } from "./csv";
 
 /**
@@ -127,7 +128,6 @@ export function leerEstado(valor: string): EstadoArchivo | undefined {
 }
 
 export const MAX_FILAS = 20000;
-const MAX_LARGO_CODIGO = 40;
 
 type IndiceColumnas = Map<keyof EstudianteArchivo, number>;
 
@@ -170,12 +170,15 @@ function leerFila(valores: string[], indice: IndiceColumnas): { estudiante: Estu
   };
 
   const codigo = celda("codigo");
-  const nombre = celda("nombre").replace(/\s+/g, " ");
-  const programa = celda("programa");
+  const nombre = textoLimpio(celda("nombre"));
+  const programa = textoLimpio(celda("programa"));
+  const periodo = textoLimpio(celda("periodo"));
   if (!codigo) problemas.push("falta el código");
   if (!nombre) problemas.push("falta el nombre");
   if (!programa) problemas.push("falta el programa");
-  if (codigo.length > MAX_LARGO_CODIGO) problemas.push("el código es demasiado largo");
+  for (const [campo, valor] of [["codigo", codigo], ["nombre", nombre], ["programa", programa], ["periodo", periodo]] as const) {
+    if (valor.length > LARGO_MAXIMO[campo]) problemas.push(`${nombreColumna(campo)} es demasiado largo (máximo ${LARGO_MAXIMO[campo]} caracteres)`);
+  }
 
   const semestre = numero("semestre");
   if (celda("semestre") === "") problemas.push("falta el semestre");
@@ -197,7 +200,7 @@ function leerFila(valores: string[], indice: IndiceColumnas): { estudiante: Estu
     puntajeSaber11: numero("puntajeSaber11"),
     edad: numero("edad"),
     estado: estado ?? "ACTIVO",
-    periodo: celda("periodo") || null,
+    periodo: periodo || null,
   };
   return { estudiante, problemas };
 }

@@ -74,6 +74,16 @@ describe("Validación del archivo", () => {
   });
 });
 
+describe("textos libres", () => {
+  it("rechaza programas, nombres o periodos demasiado largos y limpia los caracteres de control", () => {
+    const largo = "Derecho ".repeat(20);
+    const r = leerCSV(`codigo;nombre;programa;semestre;periodo\nA1;Ana\tPaz;${largo};3;2026-2\nA2;Luis\u0007 Gómez;Derecho;3;2026-2`);
+    expect(r.errores).toHaveLength(1);
+    expect(r.errores[0].mensaje).toContain("programa es demasiado largo (máximo 120 caracteres)");
+    expect(r.estudiantes[0].nombre).toBe("Luis Gómez");
+  });
+});
+
 describe("Excel", () => {
   it("la plantilla trae las columnas en orden y se puede leer de vuelta", async () => {
     const buffer = await plantillaExcel();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { claveNombre, formatoTitulo, normalizarValor, sinTildes } from "@/lib/texto";
+import { claveNombre, formatoTitulo, normalizarValor, sinTildes, textoLimpio } from "@/lib/texto";
 
 describe("utilidades de texto", () => {
   it("quita tildes, diéresis y la virgulilla sin tocar el resto", () => {
@@ -18,5 +18,11 @@ describe("utilidades de texto", () => {
     expect(formatoTitulo("  INGENIERÍA   DE SOFTWARE ")).toBe("Ingeniería de Software");
     expect(formatoTitulo("LICENCIATURA EN EDUCACIÓN PARA LA PAZ")).toBe("Licenciatura en Educación para la Paz");
     expect(formatoTitulo("de la salle")).toBe("De la Salle");
+  });
+});
+
+describe("textoLimpio", () => {
+  it("deja el texto en una sola línea, sin caracteres de control ni espacios repetidos", () => {
+    expect(textoLimpio("  Ana\tMaría\r\n  Paz\u0000 ")).toBe("Ana María Paz");
   });
 });
