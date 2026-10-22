@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ErrorApi, esViolacionDeUnicidad } from "@/lib/errores";
+import { bloquear } from "@/lib/bloqueos";
 import type { ActualizarUsuario, CrearUsuario } from "@/lib/validators/usuarios";
 import { consultarBloqueo, ESTADO_LIMPIO } from "@/lib/seguridad/bloqueo";
 import { cifrarContrasena } from "@/lib/seguridad/contrasenas";
@@ -46,20 +47,28 @@ export class ServicioUsuarios {
   }
 
   async actualizar(id: string, cambio: ActualizarUsuario, actorId: string) {
-    const objetivo = await prisma.usuario.findUnique({ where: { id } });
-    if (!objetivo) throw new ErrorApi(404, "La cuenta no existe.");
-    const adminsActivos = await prisma.usuario.count({ where: { rol: "ADMIN", activo: true } });
-    const error = validarCambio({ actorId, objetivo, cambio, adminsActivos });
-    if (error) throw new ErrorApi(422, error);
-    await prisma.usuario.update({
-      where: { id },
-      data: {
-        ...(cambio.nombre ? { nombre: cambio.nombre } : {}),
-        ...(cambio.rol ? { rol: cambio.rol } : {}),
-        ...(cambio.activo !== undefined ? { activo: cambio.activo } : {}),
-        ...(cambio.password ? { passwordHash: await cifrarContrasena(cambio.password), ...ESTADO_LIMPIO } : {}),
-        ...(cambio.desbloquear ? ESTADO_LIMPIO : {}),
-      },
+    // bcrypt tarda ~70 ms: se calcula antes de tomar el bloqueo para no retener a los demás
+    const passwordHash = cambio.password ? await cifrarContrasena(cambio.password) : undefined;
+    // Contar los administradores y guardar el cambio debe ser atómico: si dos administradores se quitan
+    // el rol el uno al otro al mismo tiempo, los dos veían «2 activos» y el sistema quedaba sin ninguno.
+    // El bloqueo CUENTAS hace que el segundo cambio espere y cuente después del primero.
+    await prisma.$transaction(async (tx) => {
+      await bloquear(tx, "CUENTAS");
+      const objetivo = await tx.usuario.findUnique({ where: { id } });
+      if (!objetivo) throw new ErrorApi(404, "La cuenta no existe.");
+      const adminsActivos = await tx.usuario.count({ where: { rol: "ADMIN", activo: true } });
+      const error = validarCambio({ actorId, objetivo, cambio, adminsActivos });
+      if (error) throw new ErrorApi(422, error);
+      await tx.usuario.update({
+        where: { id },
+        data: {
+          ...(cambio.nombre ? { nombre: cambio.nombre } : {}),
+          ...(cambio.rol ? { rol: cambio.rol } : {}),
+          ...(cambio.activo !== undefined ? { activo: cambio.activo } : {}),
+          ...(passwordHash ? { passwordHash, ...ESTADO_LIMPIO } : {}),
+          ...(cambio.desbloquear ? ESTADO_LIMPIO : {}),
+        },
+      });
     });
     return { ok: true };
   }
