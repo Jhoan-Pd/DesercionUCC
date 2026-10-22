@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ErrorApi } from "@/lib/errores";
+import { bloquear } from "@/lib/bloqueos";
 import { ServicioEvaluacion, type ClienteBD } from "@/services/riesgo/ServicioEvaluacion";
 import { leerExcel } from "./excel";
 import { validarTabla, type ErrorFila, type EstudianteArchivo, type ResultadoLectura } from "./lector";
@@ -16,17 +17,6 @@ const MAX_LARGO_NOMBRE_ARCHIVO = 200;
 
 /** La carga de varios miles de estudiantes con su recálculo cabe holgada en el límite de 60 s de la ruta */
 const OPCIONES_TRANSACCION = { maxWait: 15_000, timeout: 50_000 };
-
-/** Identificador del bloqueo consultivo de PostgreSQL que serializa las cargas y el borrado total */
-const BLOQUEO_DATOS = 7_314_001;
-
-/**
- * Bloqueo consultivo de transacción: si otra carga está en curso, esta espera a que termine.
- * Se libera solo al confirmar o deshacer la transacción (sirve también detrás de PgBouncer/Neon).
- */
-async function bloquearDatos(tx: ClienteBD): Promise<void> {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${BLOQUEO_DATOS})`;
-}
 
 export interface ResumenCarga {
   archivo: string;
@@ -102,7 +92,7 @@ export class ServicioCarga {
     // de camino (un lote, el entrenamiento), no queda una carga a medias. El bloqueo consultivo hace que
     // dos cargas simultáneas (o una carga y un borrado) se ejecuten una detrás de otra.
     return prisma.$transaction(async (tx) => {
-      await bloquearDatos(tx);
+      await bloquear(tx, "DATOS");
       const carga = await tx.carga.create({
         data: { archivo: nombre.slice(0, MAX_LARGO_NOMBRE_ARCHIVO), filas, nuevos: 0, actualizados: 0, errores: errores as unknown as Prisma.InputJsonValue, usuarioId },
       });
@@ -132,7 +122,7 @@ export class ServicioCarga {
   /** Borra TODOS los estudiantes, sus evaluaciones, las cargas y los modelos (para empezar de cero) */
   async borrarTodo(): Promise<{ estudiantes: number }> {
     return prisma.$transaction(async (tx) => {
-      await bloquearDatos(tx);
+      await bloquear(tx, "DATOS");
       await tx.evaluacion.deleteMany();
       const r = await tx.estudiante.deleteMany();
       await tx.carga.deleteMany();
