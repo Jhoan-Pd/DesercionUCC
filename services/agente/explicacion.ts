@@ -1,5 +1,6 @@
 import type { FactorRiesgo, NivelRiesgo } from "@/services/riesgo/factores";
 import { VARIABLE, describirValor, tieneValor, type ClaveVariable, type DatosEstudiante } from "@/services/riesgo/variables";
+import { ETIQUETA_NIVEL } from "@/services/riesgo/niveles";
 
 const APOYO_ECONOMICO = "Verificar si cumple los requisitos de los apoyos económicos de la universidad (becas, subsidios, crédito).";
 const PRIMER_ANIO = "Incluirlo en el acompañamiento de primer año (inducción, mentorías entre pares).";
@@ -26,7 +27,7 @@ export const ACCIONES: Readonly<Record<string, string>> = {
   edad: "Conversar sobre sus responsabilidades fuera de la universidad y los apoyos que necesita.",
 };
 
-const NIVEL_TEXTO: Record<NivelRiesgo, string> = { ALTO: "alto", MEDIO: "medio", BAJO: "bajo" };
+const nivelTexto = (n: NivelRiesgo) => ETIQUETA_NIVEL[n].toLowerCase();
 
 export interface EntradaExplicacion {
   programa: string;
@@ -55,9 +56,9 @@ export function explicacionBasica(e: EntradaExplicacion): string {
   const lineas: string[] = [];
   const metodo = e.metodo === "MODELO" ? "el modelo entrenado con estudiantes de la UCC" : "el puntaje por factores de riesgo";
   if (e.factores.length === 0) {
-    lineas.push(`Riesgo ${NIVEL_TEXTO[e.nivel]} (${e.puntaje}/100) según ${metodo}: con los datos disponibles no aparece ningún factor de alerta.`);
+    lineas.push(`Riesgo ${nivelTexto(e.nivel)} (${e.puntaje}/100) según ${metodo}: con los datos disponibles no aparece ningún factor de alerta.`);
   } else {
-    lineas.push(`Riesgo ${NIVEL_TEXTO[e.nivel]} (${e.puntaje}/100) según ${metodo}. Lo que más pesa:`);
+    lineas.push(`Riesgo ${nivelTexto(e.nivel)} (${e.puntaje}/100) según ${metodo}. Lo que más pesa:`);
     for (const f of e.factores.slice(0, 4)) lineas.push(`• ${e.metodo === "MODELO" ? `${f.etiqueta}: ${f.detalle}` : f.detalle}`);
   }
   const acciones = accionesSugeridas(e.factores);
@@ -92,7 +93,7 @@ export function promptExplicacion(e: EntradaExplicacion): string {
   const acciones = accionesSugeridas(e.factores).map((a) => `- ${a}`);
   return [
     `Programa: ${e.programa}`,
-    `Nivel de riesgo: ${NIVEL_TEXTO[e.nivel]} (${e.puntaje}/100)`,
+    `Nivel de riesgo: ${nivelTexto(e.nivel)} (${e.puntaje}/100)`,
     `Método: ${metodo}`,
     "",
     "Datos del estudiante:",

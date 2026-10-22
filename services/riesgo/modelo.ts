@@ -2,7 +2,8 @@ import { z } from "zod";
 import { formatoNumero } from "@/lib/formato";
 import { EntrenadorLogistico } from "./EntrenadorLogistico";
 import { calcularMetricas, esDePrueba } from "./metricas";
-import type { FactorRiesgo, NivelRiesgo, ResultadoRiesgo } from "./factores";
+import type { FactorRiesgo, ResultadoRiesgo } from "./factores";
+import { nivelSegunUmbrales } from "./niveles";
 import { CLAVES_VARIABLES, VARIABLE, VARIABLES, tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
 
 /**
@@ -170,12 +171,6 @@ export function entrenarModelo(registros: RegistroConResultado[], version: strin
   return { estado: "ENTRENADO", activable, motivo, definicion: final.definicion, metricas };
 }
 
-function nivelModelo(def: DefinicionModelo, p: number): NivelRiesgo {
-  if (p >= def.umbrales.alto) return "ALTO";
-  if (p >= def.umbrales.medio) return "MEDIO";
-  return "BAJO";
-}
-
 /**
  * Riesgo con el modelo. El puntaje es la probabilidad estimada (0-100).
  * Los puntos de cada factor reparten el riesgo que el estudiante tiene POR ENCIMA de un estudiante
@@ -207,5 +202,5 @@ export function predecirConModelo(def: DefinicionModelo, d: DatosEstudiante): Re
     })
     .filter((f): f is FactorRiesgo => f !== null)
     .sort((a, b) => b.puntos - a.puntos);
-  return { puntaje: Math.round(p * 100), nivel: nivelModelo(def, p), metodo: "MODELO", modeloVersion: def.version, factores, faltantes };
+  return { puntaje: Math.round(p * 100), nivel: nivelSegunUmbrales(p, def.umbrales), metodo: "MODELO", modeloVersion: def.version, factores, faltantes };
 }

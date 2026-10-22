@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { esNivel, nivelSegunUmbrales } from "@/services/riesgo/niveles";
 import { factoresDe, faltantesDe } from "@/services/riesgo/persistencia";
 import { CLAVES_VARIABLES, VARIABLES, datosDe } from "@/services/riesgo/variables";
 
@@ -26,5 +27,13 @@ describe("lectura de evaluaciones guardadas", () => {
   it("solo acepta variables conocidas como faltantes", () => {
     expect(faltantesDe(["promedio", "inventada", "edad"])).toEqual(["promedio", "edad"]);
     expect(faltantesDe(null)).toEqual([]);
+  });
+});
+
+describe("niveles de riesgo", () => {
+  it("un solo criterio de umbrales para el puntaje y para la probabilidad", () => {
+    expect([10, 20, 44, 45].map((p) => nivelSegunUmbrales(p, { medio: 20, alto: 45 }))).toEqual(["BAJO", "MEDIO", "MEDIO", "ALTO"]);
+    expect(nivelSegunUmbrales(0.31, { medio: 0.12, alto: 0.3 })).toBe("ALTO");
+    expect([esNivel("ALTO"), esNivel("alto"), esNivel(3)]).toEqual([true, false, false]);
   });
 });

@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { ETIQUETA_NIVEL, NIVELES } from "@/services/riesgo/niveles";
 
 export const metadata = { title: "Estudiantes en riesgo" };
 export const dynamic = "force-dynamic";
@@ -83,9 +84,11 @@ export default async function EstudiantesPage({ searchParams }: { searchParams: 
               <span className="sr-only">Nivel de riesgo</span>
               <Select name="nivel" defaultValue={filtros.nivel ?? ""}>
                 <option value="">Todos los niveles</option>
-                <option value="ALTO">Riesgo alto</option>
-                <option value="MEDIO">Riesgo medio</option>
-                <option value="BAJO">Riesgo bajo</option>
+                {NIVELES.map((n) => (
+                  <option key={n} value={n}>
+                    Riesgo {ETIQUETA_NIVEL[n].toLowerCase()}
+                  </option>
+                ))}
               </Select>
             </label>
             <div className="flex gap-2">

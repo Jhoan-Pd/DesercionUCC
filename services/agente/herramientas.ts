@@ -1,16 +1,15 @@
-import type { NivelRiesgo } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { resumenUccPasto } from "@/lib/datos-abiertos";
 import { claveNombre } from "@/lib/texto";
 import { ServicioEstudiantes } from "@/services/estudiantes/ServicioEstudiantes";
 import { factoresDe } from "@/services/riesgo/persistencia";
+import { esNivel } from "@/services/riesgo/niveles";
 import type { Herramientas } from "./declaraciones";
 
 /**
  * Herramientas que el agente consulta: leen la información REAL del sistema (estudiantes cargados y
  * cifras oficiales). Ninguna devuelve nombres, documentos ni datos de contacto.
  */
-const NIVELES = new Set(["ALTO", "MEDIO", "BAJO"]);
 
 /** Implementación real sobre la base de datos */
 export class HerramientasBD implements Herramientas {
@@ -45,7 +44,8 @@ export class HerramientasBD implements Herramientas {
   }
 
   private async buscar(args: Record<string, unknown>) {
-    const nivel = typeof args.nivel === "string" && NIVELES.has(args.nivel.toUpperCase()) ? (args.nivel.toUpperCase() as NivelRiesgo) : undefined;
+    const pedido = typeof args.nivel === "string" ? args.nivel.toUpperCase() : null;
+    const nivel = esNivel(pedido) ? pedido : undefined;
     const programa = typeof args.programa === "string" ? claveNombre(args.programa) : "";
     const semestreMax = Number.isFinite(Number(args.semestre_maximo)) ? Number(args.semestre_maximo) : undefined;
     const factor = typeof args.factor === "string" ? claveNombre(args.factor) : "";

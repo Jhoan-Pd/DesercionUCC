@@ -1,7 +1,8 @@
 import { formatoNumero } from "@/lib/formato";
+import { nivelSegunUmbrales, type NivelRiesgo } from "./niveles";
 import { tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
 
-export type NivelRiesgo = "BAJO" | "MEDIO" | "ALTO";
+export type { NivelRiesgo };
 
 /** Un factor que suma al riesgo de un estudiante (mismo formato para el puntaje por factores y para el modelo) */
 export interface FactorRiesgo {
@@ -150,10 +151,8 @@ export const FUENTE_REGLA = Object.fromEntries(REGLAS.map((r) => [r.clave, r.fue
 export const UMBRAL_MEDIO = 20;
 export const UMBRAL_ALTO = 45;
 
-export function nivelPorPuntaje(puntaje: number, umbrales = { medio: UMBRAL_MEDIO, alto: UMBRAL_ALTO }): NivelRiesgo {
-  if (puntaje >= umbrales.alto) return "ALTO";
-  if (puntaje >= umbrales.medio) return "MEDIO";
-  return "BAJO";
+export function nivelPorPuntaje(puntaje: number): NivelRiesgo {
+  return nivelSegunUmbrales(puntaje, { medio: UMBRAL_MEDIO, alto: UMBRAL_ALTO });
 }
 
 /** Calcula el puntaje por factores. Las reglas sin datos no suman y se informan como faltantes. */

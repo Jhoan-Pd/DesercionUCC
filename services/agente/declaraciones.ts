@@ -1,4 +1,5 @@
 import type { DeclaracionFuncion } from "@/lib/ia/gemini";
+import { NIVELES } from "@/services/riesgo/niveles";
 
 /**
  * Herramientas (function calling) que el agente puede usar para consultar la información REAL del sistema.
@@ -15,7 +16,7 @@ export const DECLARACIONES: DeclaracionFuncion[] = [
     parameters: {
       type: "OBJECT",
       properties: {
-        nivel: { type: "STRING", enum: ["ALTO", "MEDIO", "BAJO"], description: "Nivel de riesgo" },
+        nivel: { type: "STRING", enum: [...NIVELES], description: "Nivel de riesgo" },
         programa: { type: "STRING", description: "Nombre (o parte del nombre) del programa académico" },
         semestre_maximo: { type: "INTEGER", description: "Solo estudiantes hasta este semestre" },
         factor: { type: "STRING", description: "Texto del factor de riesgo, p. ej. 'promedio', 'asistencia', 'matrícula'" },
