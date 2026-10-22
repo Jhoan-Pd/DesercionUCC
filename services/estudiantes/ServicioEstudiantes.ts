@@ -13,6 +13,15 @@ export interface FiltrosEstudiantes {
   porPagina?: number;
 }
 
+/** Estudiante que el agente menciona en su respuesta (con nombre: se agrega en el servidor, nunca viaja a la IA) */
+export interface EstudianteMencionado {
+  codigo: string;
+  nombre: string;
+  programa: string;
+  nivel: NivelRiesgo | null;
+  puntaje: number | null;
+}
+
 export interface FilaEstudiante {
   codigo: string;
   nombre: string;
@@ -62,6 +71,20 @@ export class ServicioEstudiantes {
         factores: factoresDe(e.evaluacion?.factores).map((x) => x.etiqueta),
       })),
     };
+  }
+
+  /** Datos básicos de varios estudiantes, en el mismo orden de los códigos recibidos (omite los que no existan) */
+  async mencionados(codigos: string[]): Promise<EstudianteMencionado[]> {
+    if (codigos.length === 0) return [];
+    const filas = await prisma.estudiante.findMany({
+      where: { codigo: { in: codigos } },
+      select: { codigo: true, nombre: true, programa: true, evaluacion: { select: { nivel: true, puntaje: true } } },
+    });
+    const porCodigo = new Map(filas.map((e) => [e.codigo, e]));
+    return codigos.flatMap((codigo) => {
+      const e = porCodigo.get(codigo);
+      return e ? [{ codigo: e.codigo, nombre: e.nombre, programa: e.programa, nivel: e.evaluacion?.nivel ?? null, puntaje: e.evaluacion?.puntaje ?? null }] : [];
+    });
   }
 
   async detalle(codigo: string) {

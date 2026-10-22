@@ -1,4 +1,4 @@
-import { ClienteGemini } from "@/lib/ia/gemini";
+import { ServicioAgente } from "@/services/agente/ServicioAgente";
 import { Encabezado } from "@/components/comunes/Encabezado";
 import { ChatAgente } from "@/components/agente/ChatAgente";
 import { Alert } from "@/components/ui/alert";
@@ -7,7 +7,7 @@ export const metadata = { title: "Agente IA" };
 export const dynamic = "force-dynamic";
 
 export default function AgentePage() {
-  const disponible = ClienteGemini.desdeEntorno() !== null;
+  const disponible = new ServicioAgente().disponible;
   return (
     <>
       <Encabezado

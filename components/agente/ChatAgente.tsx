@@ -4,19 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bot, Send, User } from "lucide-react";
 import { enviarJson } from "@/lib/cliente-api";
+import type { RespuestaChat, EstudianteMencionado } from "@/services/agente/ServicioAgente";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert } from "@/components/ui/alert";
 import { NivelBadge } from "@/components/estudiantes/NivelBadge";
 import { TextoAgente } from "./TextoAgente";
-
-interface EstudianteMencionado {
-  codigo: string;
-  nombre: string;
-  programa: string;
-  nivel: "ALTO" | "MEDIO" | "BAJO" | null;
-  puntaje: number | null;
-}
 
 interface Mensaje {
   rol: "usuario" | "agente";
@@ -52,7 +45,7 @@ export function ChatAgente() {
     setError(null);
     setCargando(true);
     try {
-      const r = await enviarJson<{ respuesta: string; estudiantes: EstudianteMencionado[] }>("/api/agente", "POST", { pregunta: limpia, historial });
+      const r = await enviarJson<RespuestaChat>("/api/agente", "POST", { pregunta: limpia, historial });
       setMensajes((m) => [...m, { rol: "agente", texto: r.respuesta, estudiantes: r.estudiantes }]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "El agente no pudo responder.");
