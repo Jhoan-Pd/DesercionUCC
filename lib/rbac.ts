@@ -21,6 +21,7 @@ export const REGLAS_RUTAS: readonly { readonly prefijo: string; readonly roles: 
   // API
   { prefijo: "/api/estudiantes", roles: TODOS },
   { prefijo: "/api/agente", roles: TODOS },
+  { prefijo: "/api/grpc", roles: TODOS },
   { prefijo: "/api/cargas", roles: ["ADMIN"] },
   { prefijo: "/api/usuarios", roles: ["ADMIN"] },
 ];
