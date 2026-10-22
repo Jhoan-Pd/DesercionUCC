@@ -1,9 +1,10 @@
 import type { Evaluacion, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { puntajePorFactores, type ResultadoRiesgo } from "./factores";
-import { definicionModeloSchema, entrenarModelo, predecirConModelo, MINIMO_ENTRENAMIENTO, type DefinicionModelo, type MetricasEntrenamiento } from "./modelo";
+import { crearCalculadora } from "./calculadora";
+import type { ResultadoRiesgo } from "./factores";
+import { definicionModeloSchema, entrenarModelo, MINIMO_ENTRENAMIENTO, type DefinicionModelo, type MetricasEntrenamiento } from "./modelo";
 import { factoresDe } from "./persistencia";
-import { datosDe, type DatosEstudiante } from "./variables";
+import { datosDe } from "./variables";
 
 export interface EstadoModelo {
   /** Método con el que se calcula hoy el riesgo */
@@ -14,11 +15,6 @@ export interface EstadoModelo {
   motivo: string;
   conResultado: number;
   minimo: number;
-}
-
-/** Calcula el riesgo con el modelo activo si existe; si no, con el puntaje por factores */
-export function evaluar(datos: DatosEstudiante, modelo: DefinicionModelo | null): ResultadoRiesgo {
-  return modelo ? predecirConModelo(modelo, datos) : puntajePorFactores(datos);
 }
 
 /** Firma comparable de un resultado (JSONB no conserva el orden de las claves, por eso se arma a mano) */
@@ -91,12 +87,12 @@ export class ServicioEvaluacion {
   }
 
   async recalcular(): Promise<{ evaluados: number; cambiaron: number }> {
-    const modelo = await this.modeloActivo();
+    const calculadora = crearCalculadora(await this.modeloActivo());
     const estudiantes = await prisma.estudiante.findMany({ where: { estado: "ACTIVO" }, include: { evaluacion: true } });
 
     const nuevas: Prisma.EvaluacionCreateManyInput[] = [];
     for (const e of estudiantes) {
-      const r = evaluar(datosDe(e), modelo);
+      const r = calculadora.evaluar(datosDe(e));
       if (e.evaluacion && firma(e.evaluacion) === firma(r)) continue;
       nuevas.push({
         estudianteId: e.id,

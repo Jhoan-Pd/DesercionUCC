@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { REGLAS, nivelPorPuntaje, puntajePorFactores } from "@/services/riesgo/factores";
 import { MINIMO_ENTRENAMIENTO, decidirActivacion, entrenarModelo, predecirConModelo, variablesUtilizables, type RegistroConResultado } from "@/services/riesgo/modelo";
 import { auc } from "@/services/riesgo/metricas";
+import { CalculadoraModelo, CalculadoraPorFactores, crearCalculadora } from "@/services/riesgo/calculadora";
 
 describe("Puntaje por factores", () => {
   it("los pesos suman 100", () => {
@@ -131,5 +132,20 @@ describe("estabilidad numérica del modelo", () => {
     expect(r.puntaje).toBe(100);
     expect(r.nivel).toBe("ALTO");
     expect(r.factores.every((f) => Number.isFinite(f.puntos))).toBe(true);
+  });
+});
+
+describe("estrategias de cálculo del riesgo", () => {
+  it("sin modelo usa el puntaje por factores; con modelo, la regresión", () => {
+    const sinModelo = crearCalculadora(null);
+    expect(sinModelo).toBeInstanceOf(CalculadoraPorFactores);
+    expect(sinModelo.version).toBeNull();
+    expect(sinModelo.evaluar({ semestre: 1, promedio: 2.5 })).toEqual(puntajePorFactores({ semestre: 1, promedio: 2.5 }));
+
+    const def = { version: "ucc-1", variables: ["promedio" as const], medias: [3.5], desviaciones: [0.5], coeficientes: [-1], intercepto: -1, tasaBase: 0.3, umbrales: { medio: 0.3, alto: 0.6 } };
+    const conModelo = crearCalculadora(def);
+    expect(conModelo).toBeInstanceOf(CalculadoraModelo);
+    expect(conModelo.version).toBe("ucc-1");
+    expect(conModelo.evaluar({ semestre: 3, promedio: 2 }).metodo).toBe("MODELO");
   });
 });
