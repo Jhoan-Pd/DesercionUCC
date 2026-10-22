@@ -62,7 +62,7 @@ interface DefColumna {
 }
 
 /** Columnas de la plantilla, en orden. Toda la información de una columna (alias, rango, ayuda) vive en su fila. */
-export const COLUMNAS: DefColumna[] = [
+export const COLUMNAS: readonly DefColumna[] = [
   { campo: "codigo", alias: ["codigo", "codigo_estudiante", "codigo_estudiantil", "cod"], obligatoria: true, descripcion: "Código estudiantil (único por estudiante)", ejemplo: "" },
   { campo: "nombre", alias: ["nombre", "nombres", "nombre_completo", "estudiante"], obligatoria: true, descripcion: "Nombre completo", ejemplo: "" },
   { campo: "programa", alias: ["programa", "programa_academico", "carrera"], obligatoria: true, descripcion: "Programa académico", ejemplo: "Derecho" },

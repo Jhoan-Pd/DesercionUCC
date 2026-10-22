@@ -1,5 +1,6 @@
 import { z } from "zod";
 import "./zod-es";
+import { ROLES } from "@/lib/roles";
 
 export const contrasenaSchema = z
   .string()
@@ -11,14 +12,14 @@ export const contrasenaSchema = z
 export const crearUsuarioSchema = z.object({
   nombre: z.string().trim().min(3).max(120),
   email: z.string().trim().toLowerCase().email(),
-  rol: z.enum(["ADMIN", "BIENESTAR"]),
+  rol: z.enum(ROLES),
   password: contrasenaSchema,
 });
 
 export const actualizarUsuarioSchema = z
   .object({
     nombre: z.string().trim().min(3).max(120).optional(),
-    rol: z.enum(["ADMIN", "BIENESTAR"]).optional(),
+    rol: z.enum(ROLES).optional(),
     activo: z.boolean().optional(),
     password: contrasenaSchema.optional(),
     desbloquear: z.literal(true).optional(),

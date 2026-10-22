@@ -62,7 +62,7 @@ const n1 = (v: number) => formatoNumero(v, { min: 1, max: 2 });
  * Cuando haya al menos 200 estudiantes con resultado conocido (retirado o graduado), el sistema entrena
  * una regresión logística con esos datos y la usa en lugar de estos pesos (ver modelo.ts).
  */
-export const REGLAS: Regla[] = [
+export const REGLAS: readonly Regla[] = [
   {
     clave: "promedio",
     etiqueta: "Promedio acumulado bajo",

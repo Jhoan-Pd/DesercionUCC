@@ -1,4 +1,4 @@
-import type { Rol } from "./roles";
+import { ROLES, type Rol } from "./roles";
 
 /**
  * Control de acceso por rol (RBAC) — fuente única de verdad.
@@ -8,9 +8,10 @@ import type { Rol } from "./roles";
  * Habeas data (Ley 1581/2012): solo el personal autorizado (ADMIN y BIENESTAR) inicia sesión;
  * cargar o borrar información y gestionar cuentas es exclusivo del administrador.
  */
-export const TODOS: Rol[] = ["ADMIN", "BIENESTAR"];
+/** Los dos roles: es la misma lista de lib/roles.ts, con un nombre que se lee bien en las reglas */
+export const TODOS: readonly Rol[] = ROLES;
 
-export const REGLAS_RUTAS: { prefijo: string; roles: Rol[] }[] = [
+export const REGLAS_RUTAS: readonly { readonly prefijo: string; readonly roles: readonly Rol[] }[] = [
   { prefijo: "/inicio", roles: TODOS },
   { prefijo: "/estudiantes", roles: TODOS },
   { prefijo: "/agente", roles: TODOS },
