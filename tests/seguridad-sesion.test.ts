@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { revalidarSesion } from "@/lib/seguridad/sesion";
-import { RUTA_INICIAL, puedeAcceder } from "@/lib/rbac";
+import { PREFIJOS_PROTEGIDOS, RUTA_INICIAL, puedeAcceder } from "@/lib/rbac";
 import { esRol } from "@/lib/roles";
+import { config } from "@/middleware";
 
 describe("revalidarSesion", () => {
   it("una cuenta activa conserva la sesión con su rol ACTUAL de la base de datos", () => {
@@ -39,5 +40,11 @@ describe("permisos por rol", () => {
   it("un prefijo parecido no hereda el permiso (/cargarx no es /cargar)", () => {
     expect(puedeAcceder("/cargarx", "BIENESTAR")).toBe(true); // sin regla: solo exige sesión
     expect(puedeAcceder("/cargar/historial", "BIENESTAR")).toBe(false);
+  });
+});
+
+describe("middleware", () => {
+  it("protege exactamente las rutas que tienen regla de permisos (el matcher de Next.js debe ser estático)", () => {
+    expect([...config.matcher].sort()).toEqual(PREFIJOS_PROTEGIDOS.map((p) => `${p}/:path*`).sort());
   });
 });
