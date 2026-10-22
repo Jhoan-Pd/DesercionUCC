@@ -1,7 +1,8 @@
-import { COLOR_NIVEL } from "./NivelBadge";
+import { COLOR_NIVEL } from "@/lib/paleta";
+import type { NivelRiesgo } from "@/services/riesgo/niveles";
 
 /** Puntaje 0-100 con una barra corta; el número siempre es visible */
-export function BarraPuntaje({ puntaje, nivel }: { puntaje: number; nivel: "BAJO" | "MEDIO" | "ALTO" }) {
+export function BarraPuntaje({ puntaje, nivel }: { puntaje: number; nivel: NivelRiesgo }) {
   return (
     <div className="flex items-center gap-2">
       <span className="w-8 text-right font-serif text-[20px] font-semibold leading-none lining-nums tabular-nums">{puntaje}</span>

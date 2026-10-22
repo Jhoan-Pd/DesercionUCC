@@ -1,6 +1,8 @@
+import { formatoNumero } from "@/lib/formato";
+import { nivelSegunUmbrales, type NivelRiesgo } from "./niveles";
 import { tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
 
-export type NivelRiesgo = "BAJO" | "MEDIO" | "ALTO";
+export type { NivelRiesgo };
 
 /** Un factor que suma al riesgo de un estudiante (mismo formato para el puntaje por factores y para el modelo) */
 export interface FactorRiesgo {
@@ -12,10 +14,13 @@ export interface FactorRiesgo {
   detalle: string;
 }
 
+/** Cómo se calculó el riesgo (coincide con el enum MetodoRiesgo de la base de datos) */
+export type MetodoRiesgo = "FACTORES" | "MODELO";
+
 export interface ResultadoRiesgo {
   puntaje: number;
   nivel: NivelRiesgo;
-  metodo: "FACTORES" | "MODELO";
+  metodo: MetodoRiesgo;
   modeloVersion: string | null;
   /** Solo los factores que suman (puntos > 0), de mayor a menor */
   factores: FactorRiesgo[];
@@ -39,7 +44,7 @@ interface Regla {
 const MEN_2016 = "MEN – SPADIES, «Factores determinantes de la deserción» (2016)";
 const ACADEMICO = "Indicador académico del periodo en curso (seguimiento institucional)";
 
-const n1 = (v: number) => v.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+const n1 = (v: number) => formatoNumero(v, { min: 1, max: 2 });
 
 /**
  * PUNTAJE POR FACTORES (se usa mientras no haya un modelo entrenado con estudiantes reales de la UCC).
@@ -57,7 +62,7 @@ const n1 = (v: number) => v.toLocaleString("es-CO", { minimumFractionDigits: 1, 
  * Cuando haya al menos 200 estudiantes con resultado conocido (retirado o graduado), el sistema entrena
  * una regresión logística con esos datos y la usa en lugar de estos pesos (ver modelo.ts).
  */
-export const REGLAS: Regla[] = [
+export const REGLAS: readonly Regla[] = [
   {
     clave: "promedio",
     etiqueta: "Promedio acumulado bajo",
@@ -149,10 +154,8 @@ export const FUENTE_REGLA = Object.fromEntries(REGLAS.map((r) => [r.clave, r.fue
 export const UMBRAL_MEDIO = 20;
 export const UMBRAL_ALTO = 45;
 
-export function nivelPorPuntaje(puntaje: number, umbrales = { medio: UMBRAL_MEDIO, alto: UMBRAL_ALTO }): NivelRiesgo {
-  if (puntaje >= umbrales.alto) return "ALTO";
-  if (puntaje >= umbrales.medio) return "MEDIO";
-  return "BAJO";
+export function nivelPorPuntaje(puntaje: number): NivelRiesgo {
+  return nivelSegunUmbrales(puntaje, { medio: UMBRAL_MEDIO, alto: UMBRAL_ALTO });
 }
 
 /** Calcula el puntaje por factores. Las reglas sin datos no suman y se informan como faltantes. */
@@ -177,9 +180,3 @@ export function puntajePorFactores(d: DatosEstudiante): ResultadoRiesgo {
   return { puntaje, nivel: nivelPorPuntaje(puntaje), metodo: "FACTORES", modeloVersion: null, factores, faltantes: [...faltantes] };
 }
 
-/** Puntos máximos que se pudieron evaluar con los datos disponibles (para avisar si la evaluación es incompleta) */
-export function coberturaFactores(d: DatosEstudiante): number {
-  const total = REGLAS.reduce((s, r) => s + r.maximo, 0);
-  const evaluable = REGLAS.filter((r) => r.variables.every((v) => tieneValor(d[v]))).reduce((s, r) => s + r.maximo, 0);
-  return evaluable / total;
-}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { campoCSV, claveTexto, detectarSeparador, normalizarEncabezado, parsearCSV } from "@/services/carga/csv";
+import { ErrorCSV, detectarSeparador, normalizarEncabezado, parsearCSV } from "@/services/carga/csv";
 
 describe("parsearCSV", () => {
   it("detecta punto y coma (Excel en español) y coma", () => {
@@ -27,6 +27,21 @@ describe("parsearCSV", () => {
     expect(t.filas[0].valores[1]).toBe("línea\npartida");
   });
 
+  it("una comilla en medio de un campo es un carácter más y no se traga las filas siguientes", () => {
+    const t = parsearCSV('codigo;nombre;periodo\n1;Ana;2026-2"\n2;Luis;2026-2\n3;Eva;2026-2\n');
+    expect(t.filas.map((f) => f.valores[0])).toEqual(["1", "2", "3"]);
+    expect(t.filas[0].valores[2]).toBe('2026-2"');
+  });
+
+  it("una comilla de apertura que nunca se cierra rechaza el archivo indicando la línea", () => {
+    expect(() => parsearCSV('codigo;nombre\n1;Ana\n2;"Luis\n3;Eva\n')).toThrow(ErrorCSV);
+    try {
+      parsearCSV('codigo;nombre\n1;Ana\n2;"Luis\n3;Eva\n');
+    } catch (e) {
+      expect((e as ErrorCSV).linea).toBe(3);
+    }
+  });
+
   it("archivo vacío", () => {
     expect(parsearCSV("")).toEqual({ separador: ",", encabezados: [], filas: [] });
   });
@@ -38,16 +53,5 @@ describe("normalización", () => {
     expect(normalizarEncabezado("Código")).toBe("codigo");
     expect(normalizarEncabezado("% Financiación")).toBe("_financiacion");
     expect(normalizarEncabezado("causa-retiro")).toBe("causa_retiro");
-  });
-
-  it("claveTexto iguala textos con y sin tildes", () => {
-    expect(claveTexto("Ingeniería de Sistemas")).toBe(claveTexto("INGENIERIA DE SISTEMAS"));
-  });
-
-  it("campoCSV agrega comillas solo cuando hace falta", () => {
-    expect(campoCSV("Pasto")).toBe("Pasto");
-    expect(campoCSV("Pérez; Gómez")).toBe('"Pérez; Gómez"');
-    expect(campoCSV('dijo "hola"')).toBe('"dijo ""hola"""');
-    expect(campoCSV(3.5)).toBe("3.5");
   });
 });

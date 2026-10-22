@@ -3,18 +3,11 @@ import { getServerSession, type Session } from "next-auth";
 import { ZodError, type ZodTypeAny, type z } from "zod";
 import { authOptions } from "@/lib/auth";
 import type { Rol } from "@/lib/roles";
+import { ErrorApi } from "@/lib/errores";
+import { sinVacios } from "@/lib/utils";
+import { leerJson } from "@/lib/cuerpo";
 
-/** Error controlado de la API: se traduce a una respuesta JSON con el código HTTP indicado */
-export class ErrorApi extends Error {
-  constructor(
-    public readonly estado: number,
-    mensaje: string,
-    public readonly detalles?: unknown,
-  ) {
-    super(mensaje);
-    this.name = "ErrorApi";
-  }
-}
+export { ErrorApi, leerJson };
 
 interface Contexto {
   req: Request;
@@ -33,7 +26,7 @@ export function manejar(roles: Rol[] | null, handler: (ctx: Contexto) => Promise
     try {
       const session = await getServerSession(authOptions);
       if (!session) throw new ErrorApi(401, "No autenticado. Inicia sesión para continuar.");
-      if (session.revocada) throw new ErrorApi(401, "Tu cuenta fue desactivada. Comunícate con el administrador del observatorio.");
+      if (session.revocada) throw new ErrorApi(401, "Tu sesión se cerró porque la cuenta se desactivó o cambió su contraseña. Inicia sesión de nuevo.");
       if (roles && !roles.includes(session.user.rol)) throw new ErrorApi(403, "No tienes permisos para esta operación.");
       const resultado = await handler({ req, session, params: ruta?.params ?? {} });
       // Un handler puede devolver una respuesta ya armada (p. ej. un archivo PDF o Excel)
@@ -64,23 +57,7 @@ export function respuestaDeError(error: unknown): NextResponse {
   return NextResponse.json({ error: "Ocurrió un error inesperado. Intenta de nuevo más tarde." }, { status: 500 });
 }
 
-/** Valida el cuerpo JSON de la petición con un esquema Zod */
-export async function leerJson<T extends ZodTypeAny>(req: Request, esquema: T): Promise<z.infer<T>> {
-  let cuerpo: unknown;
-  try {
-    cuerpo = await req.json();
-  } catch {
-    throw new ErrorApi(400, "El cuerpo de la petición no es un JSON válido.");
-  }
-  return esquema.parse(cuerpo);
-}
-
 /** Valida los parámetros de la URL (query string) con un esquema Zod */
 export function leerQuery<T extends ZodTypeAny>(req: Request, esquema: T): z.infer<T> {
-  const { searchParams } = new URL(req.url);
-  const objeto: Record<string, string> = {};
-  searchParams.forEach((valor, clave) => {
-    if (valor !== "") objeto[clave] = valor;
-  });
-  return esquema.parse(objeto);
+  return esquema.parse(sinVacios(new URL(req.url).searchParams));
 }

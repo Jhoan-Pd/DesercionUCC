@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { formatoNumero } from "@/lib/formato";
 import { EntrenadorLogistico } from "./EntrenadorLogistico";
-import { calcularMetricas, esDePrueba } from "./metricas";
-import type { FactorRiesgo, NivelRiesgo, ResultadoRiesgo } from "./factores";
-import { CLAVES_VARIABLES, VARIABLES, tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
+import { calcularMetricas, esDePrueba, type MetricasModelo } from "./metricas";
+import type { FactorRiesgo, ResultadoRiesgo } from "./factores";
+import { nivelSegunUmbrales } from "./niveles";
+import { CLAVES_VARIABLES, VARIABLE, VARIABLES, tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
 
 /**
  * MODELO ESTADÍSTICO entrenado con estudiantes REALES de la UCC que ya tienen resultado conocido
@@ -101,7 +103,11 @@ function ajustar(registros: RegistroConResultado[], variables: ClaveVariable[], 
   return { definicion, convergio: ajuste.convergio };
 }
 
-export function probabilidad(def: DefinicionModelo, d: DatosEstudiante): { p: number; aportes: number[]; x: number[] } {
+/**
+ * Probabilidad estimada y aporte de cada variable al logit. Se devuelve también el logit: recalcularlo
+ * después como log(p / (1 - p)) da infinito cuando p se redondea a 1 (logit mayor que ~37).
+ */
+export function probabilidad(def: DefinicionModelo, d: DatosEstudiante): { p: number; logit: number; aportes: number[] } {
   const x = vectorizar(d, def.variables, def.medias);
   let logit = def.intercepto;
   const aportes = x.map((v, i) => {
@@ -110,7 +116,7 @@ export function probabilidad(def: DefinicionModelo, d: DatosEstudiante): { p: nu
     logit += a;
     return a;
   });
-  return { p: sigmoide(logit), aportes, x };
+  return { p: sigmoide(logit), logit, aportes };
 }
 
 export function entrenarModelo(registros: RegistroConResultado[], version: string, fecha = new Date()): ResultadoEntrenamiento {
@@ -130,16 +136,15 @@ export function entrenarModelo(registros: RegistroConResultado[], version: strin
   }
 
   // Evaluación honesta: se ajusta con el 80 % y se mide con el 20 % restante (por código de estudiante)
-  const prueba = registros.filter((r) => esDePrueba(r.codigo));
-  const entrenamiento = registros.filter((r) => !esDePrueba(r.codigo));
-  const eval_ = ajustar(entrenamiento, variables, `${version}-eval`);
+  const { prueba, entrenamiento } = separarPorCodigo(registros);
+  const evaluacion = ajustar(entrenamiento, variables, `${version}-eval`);
   const yPrueba = prueba.map((r) => (r.retirado ? 1 : 0));
-  const pPrueba = prueba.map((r) => probabilidad(eval_.definicion, r.datos).p);
-  const m = calcularMetricas(pPrueba, yPrueba, eval_.definicion.umbrales.alto);
+  const pPrueba = prueba.map((r) => probabilidad(evaluacion.definicion, r.datos).p);
+  const m = calcularMetricas(pPrueba, yPrueba, evaluacion.definicion.umbrales.alto);
 
   // Modelo final con todos los datos
   const final = ajustar(registros, variables, version);
-  const convergio = eval_.convergio && final.convergio;
+  const convergio = evaluacion.convergio && final.convergio;
   const metricas: MetricasEntrenamiento = {
     estudiantes: registros.length,
     retirados,
@@ -153,26 +158,31 @@ export function entrenarModelo(registros: RegistroConResultado[], version: strin
     variables,
     entrenadoEn: fecha.toISOString(),
   };
-  const aucTxt = Number.isFinite(m.auc) ? m.auc.toLocaleString("es-CO", { maximumFractionDigits: 3 }) : "sin calcular";
-  let activable = true;
-  let motivo = `El modelo distingue bien a quienes se retiraron (AUC ${aucTxt} con estudiantes que no usó para aprender).`;
-  if (!convergio) {
-    activable = false;
-    motivo = "El entrenamiento no convergió; se mantiene el puntaje por factores.";
-  } else if (!Number.isFinite(m.auc) || m.positivos < 10 || m.positivos === m.n) {
-    activable = false;
-    motivo = "La muestra de prueba no tiene suficientes retirados y graduados para evaluar el modelo; se mantiene el puntaje por factores.";
-  } else if (m.auc < AUC_MINIMO) {
-    activable = false;
-    motivo = `El modelo no discrimina lo suficiente (AUC ${aucTxt} < ${AUC_MINIMO.toLocaleString("es-CO")}); se mantiene el puntaje por factores.`;
-  }
-  return { estado: "ENTRENADO", activable, motivo, definicion: final.definicion, metricas };
+  return { estado: "ENTRENADO", ...decidirActivacion(m, convergio), definicion: final.definicion, metricas };
 }
 
-function nivelModelo(def: DefinicionModelo, p: number): NivelRiesgo {
-  if (p >= def.umbrales.alto) return "ALTO";
-  if (p >= def.umbrales.medio) return "MEDIO";
-  return "BAJO";
+/** Separa en una sola pasada los estudiantes de prueba (20 %, fijo por código) y los de entrenamiento */
+function separarPorCodigo(registros: RegistroConResultado[]) {
+  const prueba: RegistroConResultado[] = [];
+  const entrenamiento: RegistroConResultado[] = [];
+  for (const r of registros) (esDePrueba(r.codigo) ? prueba : entrenamiento).push(r);
+  return { prueba, entrenamiento };
+}
+
+/** Mínimo de retirados en la muestra de prueba para confiar en el AUC */
+const MINIMO_RETIRADOS_PRUEBA = 10;
+
+/** Regla de activación del modelo, con el motivo que se muestra en pantalla */
+export function decidirActivacion(m: Pick<MetricasModelo, "auc" | "positivos" | "n">, convergio: boolean): { activable: boolean; motivo: string } {
+  const aucTxt = Number.isFinite(m.auc) ? formatoNumero(m.auc, { max: 3 }) : "sin calcular";
+  if (!convergio) return { activable: false, motivo: "El entrenamiento no convergió; se mantiene el puntaje por factores." };
+  if (!Number.isFinite(m.auc) || m.positivos < MINIMO_RETIRADOS_PRUEBA || m.positivos === m.n) {
+    return { activable: false, motivo: "La muestra de prueba no tiene suficientes retirados y graduados para evaluar el modelo; se mantiene el puntaje por factores." };
+  }
+  if (m.auc < AUC_MINIMO) {
+    return { activable: false, motivo: `El modelo no discrimina lo suficiente (AUC ${aucTxt} < ${formatoNumero(AUC_MINIMO)}); se mantiene el puntaje por factores.` };
+  }
+  return { activable: true, motivo: `El modelo distingue bien a quienes se retiraron (AUC ${aucTxt} con estudiantes que no usó para aprender).` };
 }
 
 /**
@@ -183,8 +193,7 @@ function nivelModelo(def: DefinicionModelo, p: number): NivelRiesgo {
  * promedio, cada factor muestra cuánto subiría el riesgo frente al promedio en ese dato.
  */
 export function predecirConModelo(def: DefinicionModelo, d: DatosEstudiante): ResultadoRiesgo {
-  const { p, aportes } = probabilidad(def, d);
-  const logit = Math.log(p / (1 - p));
+  const { p, logit, aportes } = probabilidad(def, d);
   const pPromedio = sigmoide(def.intercepto);
   const faltantes = def.variables.filter((v) => !tieneValor(d[v]));
   const positivos = def.variables.map((v, i) => (tieneValor(d[v]) && aportes[i] > 0 ? aportes[i] : 0));
@@ -197,14 +206,14 @@ export function predecirConModelo(def: DefinicionModelo, d: DatosEstudiante): Re
       const puntos = Math.round(100 * (exceso > 0 ? (exceso * positivos[i]) / sumaPositivos : p - sigmoide(logit - aportes[i])));
       if (puntos < 1) return null;
       const valor = d[clave] as number | boolean;
-      const def_ = VARIABLES.find((v) => v.clave === clave)!;
+      const variable = VARIABLE[clave];
       const detalle =
         typeof valor === "boolean"
-          ? `${def_.formato(valor)}; en la UCC lo tiene el ${Math.round(def.medias[i] * 100)} % de los estudiantes con resultado conocido.`
-          : `${def_.formato(valor)} frente a ${def_.formato(def.medias[i])} en promedio en la UCC.`;
-      return { clave, etiqueta: def_.etiqueta, puntos, detalle };
+          ? `${variable.formato(valor)}; en la UCC lo tiene el ${Math.round(def.medias[i] * 100)} % de los estudiantes con resultado conocido.`
+          : `${variable.formato(valor)} frente a ${variable.formato(def.medias[i])} en promedio en la UCC.`;
+      return { clave, etiqueta: variable.etiqueta, puntos, detalle };
     })
     .filter((f): f is FactorRiesgo => f !== null)
     .sort((a, b) => b.puntos - a.puntos);
-  return { puntaje: Math.round(p * 100), nivel: nivelModelo(def, p), metodo: "MODELO", modeloVersion: def.version, factores, faltantes };
+  return { puntaje: Math.round(p * 100), nivel: nivelSegunUmbrales(p, def.umbrales), metodo: "MODELO", modeloVersion: def.version, factores, faltantes };
 }

@@ -37,6 +37,12 @@ enum NivelRiesgo {
   ALTO
 }
 
+/// Cómo se calculó el riesgo: puntaje por factores (criterio experto) o modelo entrenado con datos de la UCC
+enum MetodoRiesgo {
+  FACTORES
+  MODELO
+}
+
 model Usuario {
   id               String    @id @default(uuid())
   email            String    @unique
@@ -120,7 +126,7 @@ model Evaluacion {
   puntaje       Int
   nivel         NivelRiesgo
   /// "FACTORES" (puntaje por factores documentados) o "MODELO" (regresión logística entrenada con datos de la UCC)
-  metodo        String
+  metodo        MetodoRiesgo
   /// Versión del modelo cuando metodo = MODELO
   modeloVersion String?
   /// Factores que suman al riesgo: [{ clave, etiqueta, puntos, detalle }]

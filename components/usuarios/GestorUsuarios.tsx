@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { KeyRound, Lock, UserPlus } from "lucide-react";
 import { enviarJson } from "@/lib/cliente-api";
 import { ETIQUETA_ROL, type Rol } from "@/lib/roles";
+import type { UsuarioFila } from "@/services/usuarios/ServicioUsuarios";
+import { formatoFechaHora } from "@/lib/formato";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,16 +14,6 @@ import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-
-export interface UsuarioFila {
-  id: string;
-  nombre: string;
-  email: string;
-  rol: Rol;
-  activo: boolean;
-  bloqueado: boolean;
-  ultimoAcceso: string | null;
-}
 
 export function GestorUsuarios({ usuarios, actualId }: { usuarios: UsuarioFila[]; actualId: string }) {
   const router = useRouter();
@@ -128,7 +120,7 @@ export function GestorUsuarios({ usuarios, actualId }: { usuarios: UsuarioFila[]
                     </Badge>
                   )}
                 </TD>
-                <TD className="font-mono text-xs text-piedra">{u.ultimoAcceso ? new Date(u.ultimoAcceso).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" }) : "Nunca"}</TD>
+                <TD className="font-mono text-xs text-piedra">{u.ultimoAcceso ? formatoFechaHora(u.ultimoAcceso) : "Nunca"}</TD>
                 <TD>
                   <div className="flex flex-wrap gap-2">
                     {!soyYo && (

@@ -7,7 +7,7 @@
  * cuenta del primer administrador, y solo si todavía no hay ninguno (nunca borra nada).
  */
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
+import { cifrarContrasena } from "../lib/seguridad/contrasenas";
 import { urlParaPrisma } from "../lib/url-base-datos";
 import { cuentaInicial } from "./cuenta-inicial";
 
@@ -21,7 +21,7 @@ export async function crearAdministradorInicial(cliente: PrismaClient = prisma):
     data: {
       email: cuenta.email,
       nombre: "Administrador del Observatorio",
-      passwordHash: await bcrypt.hash(cuenta.password, 10),
+      passwordHash: await cifrarContrasena(cuenta.password),
       rol: "ADMIN",
     },
   });

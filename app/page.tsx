@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { rutaInicial } from "@/lib/rbac";
+import { RUTA_INICIAL } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +9,6 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
-  if (session.revocada) redirect("/login?motivo=cuenta-desactivada");
-  redirect(rutaInicial(session.user.rol));
+  if (session.revocada) redirect("/login?motivo=sesion-revocada");
+  redirect(RUTA_INICIAL);
 }

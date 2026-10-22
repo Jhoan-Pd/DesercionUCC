@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { REGLAS, coberturaFactores, nivelPorPuntaje, puntajePorFactores } from "@/services/riesgo/factores";
-import { MINIMO_ENTRENAMIENTO, entrenarModelo, predecirConModelo, variablesUtilizables, type RegistroConResultado } from "@/services/riesgo/modelo";
+import { REGLAS, nivelPorPuntaje, puntajePorFactores } from "@/services/riesgo/factores";
+import { MINIMO_ENTRENAMIENTO, decidirActivacion, entrenarModelo, predecirConModelo, variablesUtilizables, type RegistroConResultado } from "@/services/riesgo/modelo";
 import { auc } from "@/services/riesgo/metricas";
+import { CalculadoraModelo, CalculadoraPorFactores, crearCalculadora } from "@/services/riesgo/calculadora";
 
 describe("Puntaje por factores", () => {
   it("los pesos suman 100", () => {
@@ -25,7 +26,6 @@ describe("Puntaje por factores", () => {
     const r = puntajePorFactores({ semestre: 1 });
     expect(r.puntaje).toBe(8);
     expect(r.faltantes).toEqual(expect.arrayContaining(["promedio", "materiasPerdidas", "asistencia", "moraMatricula", "puntajeSaber11", "trabaja", "estrato", "apoyoFinanciero"]));
-    expect(coberturaFactores({ semestre: 1 })).toBeCloseTo(0.08);
   });
 
   it("estrato bajo solo suma si además no tiene apoyo financiero", () => {
@@ -112,5 +112,40 @@ describe("Modelo entrenado con estudiantes que ya tienen resultado", () => {
   it("AUC: 1 cuando ordena perfecto y 0,5 con empates", () => {
     expect(auc([0.1, 0.2, 0.8, 0.9], [0, 0, 1, 1])).toBe(1);
     expect(auc([0.5, 0.5, 0.5, 0.5], [0, 1, 0, 1])).toBe(0.5);
+  });
+});
+
+describe("regla de activación del modelo", () => {
+  it("solo activa un modelo que convergió, con suficientes retirados en la prueba y AUC ≥ 0,70", () => {
+    expect(decidirActivacion({ auc: 0.85, positivos: 20, n: 80 }, true).activable).toBe(true);
+    expect(decidirActivacion({ auc: 0.85, positivos: 20, n: 80 }, false).motivo).toContain("no convergió");
+    expect(decidirActivacion({ auc: 0.85, positivos: 5, n: 80 }, true).motivo).toContain("no tiene suficientes retirados");
+    expect(decidirActivacion({ auc: Number.NaN, positivos: 20, n: 80 }, true).activable).toBe(false);
+    expect(decidirActivacion({ auc: 0.65, positivos: 20, n: 80 }, true).motivo).toContain("0,65 < 0,7");
+  });
+});
+
+describe("estabilidad numérica del modelo", () => {
+  it("con un logit enorme la probabilidad es 1 y los factores siguen siendo números", () => {
+    const def = { version: "t", variables: ["promedio"] as const, medias: [3.5], desviaciones: [0.1], coeficientes: [-30], intercepto: 0, tasaBase: 0.3, umbrales: { medio: 0.3, alto: 0.6 } };
+    const r = predecirConModelo({ ...def, variables: [...def.variables] }, { semestre: 3, promedio: 2 });
+    expect(r.puntaje).toBe(100);
+    expect(r.nivel).toBe("ALTO");
+    expect(r.factores.every((f) => Number.isFinite(f.puntos))).toBe(true);
+  });
+});
+
+describe("estrategias de cálculo del riesgo", () => {
+  it("sin modelo usa el puntaje por factores; con modelo, la regresión", () => {
+    const sinModelo = crearCalculadora(null);
+    expect(sinModelo).toBeInstanceOf(CalculadoraPorFactores);
+    expect(sinModelo.version).toBeNull();
+    expect(sinModelo.evaluar({ semestre: 1, promedio: 2.5 })).toEqual(puntajePorFactores({ semestre: 1, promedio: 2.5 }));
+
+    const def = { version: "ucc-1", variables: ["promedio" as const], medias: [3.5], desviaciones: [0.5], coeficientes: [-1], intercepto: -1, tasaBase: 0.3, umbrales: { medio: 0.3, alto: 0.6 } };
+    const conModelo = crearCalculadora(def);
+    expect(conModelo).toBeInstanceOf(CalculadoraModelo);
+    expect(conModelo.version).toBe("ucc-1");
+    expect(conModelo.evaluar({ semestre: 3, promedio: 2 }).metodo).toBe("MODELO");
   });
 });

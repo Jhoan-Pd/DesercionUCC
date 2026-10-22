@@ -2,6 +2,7 @@ import { Download } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { COLUMNAS } from "@/services/carga/lector";
 import { ServicioCarga } from "@/services/carga/ServicioCarga";
+import { formatoFechaHora, formatoNumero } from "@/lib/formato";
 import { Encabezado } from "@/components/comunes/Encabezado";
 import { CargaArchivo } from "@/components/carga/CargaArchivo";
 import { BorrarDatos } from "@/components/carga/BorrarDatos";
@@ -12,7 +13,6 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 export const metadata = { title: "Cargar datos" };
 export const dynamic = "force-dynamic";
 
-const n = (v: number) => v.toLocaleString("es-CO");
 
 export default async function CargarPage() {
   const [historial, total] = await Promise.all([new ServicioCarga().historial(), prisma.estudiante.count()]);
@@ -37,7 +37,7 @@ export default async function CargarPage() {
         <Card>
           <CardHeader>
             <CardTitle>subir archivo.</CardTitle>
-            <CardDescription>Actualmente hay {n(total)} estudiantes cargados.</CardDescription>
+            <CardDescription>Actualmente hay {formatoNumero(total)} estudiantes cargados.</CardDescription>
           </CardHeader>
           <CardContent>
             <CargaArchivo />
@@ -88,12 +88,12 @@ export default async function CargarPage() {
               <TBody>
                 {historial.map((c) => (
                   <TR key={c.id}>
-                    <TD className="whitespace-nowrap font-mono text-xs">{new Date(c.creadaEn).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" })}</TD>
+                    <TD className="whitespace-nowrap font-mono text-xs">{formatoFechaHora(c.creadaEn)}</TD>
                     <TD className="max-w-[240px] truncate">{c.archivo}</TD>
                     <TD>{c.usuario}</TD>
-                    <TD className="text-right tabular-nums">{n(c.nuevos)}</TD>
-                    <TD className="text-right tabular-nums">{n(c.actualizados)}</TD>
-                    <TD className="text-right tabular-nums">{n(c.errores)}</TD>
+                    <TD className="text-right tabular-nums">{formatoNumero(c.nuevos)}</TD>
+                    <TD className="text-right tabular-nums">{formatoNumero(c.actualizados)}</TD>
+                    <TD className="text-right tabular-nums">{formatoNumero(c.errores)}</TD>
                   </TR>
                 ))}
               </TBody>

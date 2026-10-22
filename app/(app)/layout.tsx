@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
-  if (session.revocada) redirect("/login?motivo=cuenta-desactivada");
+  if (session.revocada) redirect("/login?motivo=sesion-revocada");
   const { rol, name, email } = session.user;
   // Segunda verificación del permiso con el rol actual (el middleware usa el rol guardado en el token)
   const ruta = headers().get("x-ruta");

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 const alertVariants = cva("flex gap-3 rounded-lg border p-4 text-sm leading-relaxed", {
   variants: {
     variant: {
-      info: "border-bruma bg-[#EEF3F6] text-marino",
+      info: "border-bruma bg-niebla text-marino",
       success: "border-riesgo-bajo-borde bg-riesgo-bajo-fondo text-riesgo-bajo",
       warning: "border-riesgo-medio-borde bg-riesgo-medio-fondo text-riesgo-medio",
       error: "border-riesgo-alto-borde bg-riesgo-alto-fondo text-riesgo-alto",

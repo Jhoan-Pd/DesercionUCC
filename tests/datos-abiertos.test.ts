@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DATOS_UCC, claveNombre, formatoTitulo, matriculaPorAnio, matriculaPorPrograma, resumenUccPasto, variacion } from "@/lib/datos-abiertos";
+import { DATOS_UCC, matriculaPorAnio, matriculaPorPrograma, resumenUccPasto, variacion } from "@/lib/datos-abiertos";
+import { claveNombre, formatoTitulo } from "@/lib/texto";
 import { depurarMatricula, esUcc, programasActivosUccPasto, totalPorAnio, totalPorCampus, type FilaMatriculaMen, type FilaProgramaMen } from "@/lib/datos-abiertos-depuracion";
 
 const fila = (p: Partial<FilaMatriculaMen>): FilaMatriculaMen => ({
@@ -113,5 +114,12 @@ describe("Resumen de las cifras oficiales (datos reales incluidos en el reposito
     expect(claveNombre("Odontología")).toBe(claveNombre("ODONTOLOGIA"));
     expect(variacion(100, 80)).toBeCloseTo(-0.2);
     expect(variacion(0, 5)).toBeNull();
+  });
+});
+
+describe("resumen en caché", () => {
+  it("el resumen de los datos del repositorio se calcula una sola vez", () => {
+    expect(resumenUccPasto()).toBe(resumenUccPasto());
+    expect(resumenUccPasto({ ...DATOS_UCC })).not.toBe(resumenUccPasto());
   });
 });

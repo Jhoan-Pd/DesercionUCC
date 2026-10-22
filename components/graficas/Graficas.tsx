@@ -1,9 +1,11 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { COLOR } from "@/lib/colores";
+import { COLOR_GRAFICA as COLOR } from "@/lib/paleta";
+import { formatoNumero } from "@/lib/formato";
 
-const fmt = (v: number) => v.toLocaleString("es-CO");
+/** Recharts llama al formateador con (valor, índice): se envuelve para no pasar el índice como decimales */
+const fmt = (v: number) => formatoNumero(v);
 
 interface Punto {
   etiqueta: string;
@@ -19,7 +21,7 @@ function Ayuda({ active, payload, unidad }: { active?: boolean; payload?: { payl
     <div className="rounded-md border bg-card px-3 py-2 text-xs shadow-suave">
       <p className="font-semibold">{p.etiqueta}</p>
       <p className="tabular-nums text-muted-foreground">
-        {fmt(p.valor)} {unidad}
+        {formatoNumero(p.valor)} {unidad}
       </p>
     </div>
   );

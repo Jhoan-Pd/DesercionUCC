@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { validarCambio } from "@/services/usuarios/reglas";
 import { actualizarUsuarioSchema, crearUsuarioSchema } from "@/lib/validators/usuarios";
+import { esViolacionDeUnicidad } from "@/lib/errores";
+import { COSTO_BCRYPT, cifrarContrasena } from "@/lib/seguridad/contrasenas";
 
 const admin = { id: "a", rol: "ADMIN" as const, activo: true };
 
@@ -24,5 +26,19 @@ describe("reglas de cuentas", () => {
     expect(crearUsuarioSchema.safeParse({ nombre: "Ana Ruiz", email: "ana@ucc.edu.co", rol: "DOCENTE", password: "Bienestar2026" }).success).toBe(false);
     expect(crearUsuarioSchema.safeParse({ nombre: "Ana Ruiz", email: "ana@ucc.edu.co", rol: "BIENESTAR", password: "corta" }).success).toBe(false);
     expect(actualizarUsuarioSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe("errores de la base de datos", () => {
+  it("reconoce la violación de unicidad por su código, sin depender de la clase de Prisma", () => {
+    expect(esViolacionDeUnicidad({ code: "P2002", meta: { target: ["email"] } })).toBe(true);
+    expect(esViolacionDeUnicidad({ code: "P2025" })).toBe(false);
+    expect(esViolacionDeUnicidad(new Error("otra cosa"))).toBe(false);
+    expect(esViolacionDeUnicidad(null)).toBe(false);
+  });
+
+  it("las contraseñas se cifran con bcrypt y el costo acordado", async () => {
+    const hash = await cifrarContrasena("Clave2026");
+    expect(hash).toMatch(new RegExp(`^\\$2[aby]\\$${COSTO_BCRYPT}\\$`));
   });
 });

@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import type { TablaCSV } from "./csv";
+import { PALETA } from "@/lib/paleta";
 import { COLUMNAS, ENCABEZADOS_PLANTILLA } from "./lector";
 
 /** Convierte la primera hoja de un archivo .xlsx en la misma tabla que produce el lector de CSV */
@@ -11,9 +12,12 @@ export async function leerExcel(buffer: ArrayBuffer): Promise<TablaCSV> {
 
   const filas: { linea: number; valores: string[] }[] = [];
   let encabezados: string[] = [];
+  // columnCount recorre TODAS las filas cada vez que se lee: se calcula una sola vez. Dentro del
+  // ciclo convertía la lectura en O(filas²) (3.000 filas tardaban ~6 s y 10.000 más de 60 s).
+  const ancho = hoja.columnCount;
   hoja.eachRow({ includeEmpty: false }, (fila, numero) => {
     const valores: string[] = [];
-    for (let c = 1; c <= hoja.columnCount; c++) {
+    for (let c = 1; c <= ancho; c++) {
       const celda = fila.getCell(c);
       valores.push(textoCelda(celda).trim());
     }
@@ -26,10 +30,14 @@ export async function leerExcel(buffer: ArrayBuffer): Promise<TablaCSV> {
   return { separador: ",", encabezados, filas };
 }
 
+/** Dígitos decimales que se conservan al pasar un porcentaje de Excel (0,855) a número (85,5) */
+const DECIMALES_PORCENTAJE = 1e6;
+
 function textoCelda(celda: ExcelJS.Cell): string {
   const v = celda.value;
   if (v === null || v === undefined) return "";
-  if (typeof v === "number") return String(v);
+  // Una celda con formato de porcentaje muestra «85 %» pero guarda 0,85: se lee como la ve el usuario
+  if (typeof v === "number") return String(celda.numFmt?.includes("%") ? Math.round(v * 100 * DECIMALES_PORCENTAJE) / DECIMALES_PORCENTAJE : v);
   if (typeof v === "boolean") return v ? "sí" : "no";
   if (v instanceof Date) return v.toISOString().slice(0, 10);
   if (typeof v === "object" && "result" in v) return v.result === undefined || v.result === null ? "" : String(v.result); // fórmula
@@ -45,7 +53,7 @@ export async function plantillaExcel(): Promise<Buffer> {
   const hoja = libro.addWorksheet("Estudiantes");
   hoja.addRow(ENCABEZADOS_PLANTILLA);
   hoja.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-  hoja.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF00549F" } };
+  hoja.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${PALETA.tinta.slice(1)}` } };
   hoja.columns.forEach((c) => (c.width = 18));
   hoja.views = [{ state: "frozen", ySplit: 1 }];
 

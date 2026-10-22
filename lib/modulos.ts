@@ -7,11 +7,11 @@ export interface Modulo {
   /** Nombre corto para la barra de navegación */
   corto: string;
   descripcion: string;
-  roles: Rol[];
+  roles: readonly Rol[];
 }
 
 /** Secciones de la barra de navegación (el orden da el número de la ceja: [01], [02]…): pocas secciones, centradas en detectar y acompañar a los estudiantes en riesgo */
-export const MODULOS: Modulo[] = [
+export const MODULOS: readonly Modulo[] = [
   { href: "/inicio", titulo: "Inicio", corto: "Inicio", descripcion: "Resumen del riesgo de los estudiantes cargados.", roles: TODOS },
   { href: "/estudiantes", titulo: "Estudiantes en riesgo", corto: "Estudiantes", descripcion: "Lista priorizada y ficha de cada estudiante.", roles: TODOS },
   { href: "/agente", titulo: "Agente IA", corto: "Agente IA", descripcion: "Pregúntale al agente por los estudiantes en riesgo.", roles: TODOS },

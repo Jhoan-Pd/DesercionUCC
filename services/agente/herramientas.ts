@@ -1,34 +1,44 @@
-import type { NivelRiesgo } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { claveNombre, resumenUccPasto } from "@/lib/datos-abiertos";
-import { ServicioEstudiantes, factoresDe } from "@/services/estudiantes/ServicioEstudiantes";
-import type { Herramientas } from "./declaraciones";
+import { resumenUccPasto } from "@/lib/datos-abiertos";
+import { claveNombre } from "@/lib/texto";
+import { memorizar } from "@/lib/utils";
+import { ServicioEstudiantes } from "@/services/estudiantes/ServicioEstudiantes";
+import { factoresDe } from "@/services/riesgo/persistencia";
+import { esNivel } from "@/services/riesgo/niveles";
+import { DECLARACIONES, esNombreHerramienta, type Herramientas, type NombreHerramienta } from "./declaraciones";
 
 /**
  * Herramientas que el agente consulta: leen la información REAL del sistema (estudiantes cargados y
  * cifras oficiales). Ninguna devuelve nombres, documentos ni datos de contacto.
  */
-const NIVELES = new Set(["ALTO", "MEDIO", "BAJO"]);
+
+/** Función que atiende una herramienta con los argumentos que envía Gemini */
+type Ejecutor = (args: Record<string, unknown>) => Promise<Record<string, unknown>> | Record<string, unknown>;
 
 /** Implementación real sobre la base de datos */
 export class HerramientasBD implements Herramientas {
+  readonly declaraciones = DECLARACIONES;
+
+  /**
+   * Registro nombre -> ejecutor (patrón Command). Al ser un Record<NombreHerramienta, …>, TypeScript
+   * exige un ejecutor por cada herramienta declarada: no puede quedar una sin implementar.
+   */
+  private readonly ejecutores: Readonly<Record<NombreHerramienta, Ejecutor>> = {
+    resumen_riesgo: () => this.resumen(),
+    buscar_estudiantes: (args) => this.buscar(args),
+    detalle_estudiante: (args) => this.detalle(String(args.codigo ?? "")),
+    cifras_oficiales_ucc: () => this.cifras(),
+  };
+
+  constructor(private readonly estudiantes: ServicioEstudiantes = new ServicioEstudiantes()) {}
+
   async ejecutar(nombre: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
-    switch (nombre) {
-      case "resumen_riesgo":
-        return this.resumen();
-      case "buscar_estudiantes":
-        return this.buscar(args);
-      case "detalle_estudiante":
-        return this.detalle(String(args.codigo ?? ""));
-      case "cifras_oficiales_ucc":
-        return this.cifras();
-      default:
-        return { error: `Herramienta desconocida: ${nombre}` };
-    }
+    if (!esNombreHerramienta(nombre)) return { error: `Herramienta desconocida: ${nombre}` };
+    return this.ejecutores[nombre](args);
   }
 
   private async resumen() {
-    const r = await new ServicioEstudiantes().resumen();
+    const r = await this.estudiantes.resumen();
     if (r.activos === 0) return { estudiantesActivos: 0, aviso: "No hay estudiantes cargados. El administrador debe subir el archivo de estudiantes en la página «Cargar datos»." };
     return {
       estudiantesActivos: r.activos,
@@ -43,26 +53,38 @@ export class HerramientasBD implements Herramientas {
   }
 
   private async buscar(args: Record<string, unknown>) {
-    const nivel = typeof args.nivel === "string" && NIVELES.has(args.nivel.toUpperCase()) ? (args.nivel.toUpperCase() as NivelRiesgo) : undefined;
+    const pedido = typeof args.nivel === "string" ? args.nivel.toUpperCase() : null;
+    const nivel = esNivel(pedido) ? pedido : undefined;
     const programa = typeof args.programa === "string" ? claveNombre(args.programa) : "";
     const semestreMax = Number.isFinite(Number(args.semestre_maximo)) ? Number(args.semestre_maximo) : undefined;
     const factor = typeof args.factor === "string" ? claveNombre(args.factor) : "";
     const limite = Math.min(50, Math.max(1, Number(args.limite) || 15));
 
+    // El programa se compara sin tildes, algo que PostgreSQL no hace con ILIKE: se buscan primero los
+    // pocos programas que coinciden (uno por nombre distinto) y luego se filtra en la consulta con IN.
+    const programas = programa ? (await this.estudiantes.programas()).filter((p) => claveNombre(p).includes(programa)) : null;
+    if (programas?.length === 0) return { total: 0, mostrados: 0, estudiantes: [] };
+
     const filas = await prisma.estudiante.findMany({
-      where: { estado: "ACTIVO", evaluacion: nivel ? { nivel } : { isNot: null }, ...(semestreMax ? { semestre: { lte: semestreMax } } : {}) },
+      where: {
+        estado: "ACTIVO",
+        evaluacion: nivel ? { nivel } : { isNot: null },
+        ...(semestreMax ? { semestre: { lte: semestreMax } } : {}),
+        ...(programas ? { programa: { in: programas } } : {}),
+      },
       select: { codigo: true, programa: true, semestre: true, evaluacion: { select: { puntaje: true, nivel: true, factores: true } } },
       orderBy: { evaluacion: { puntaje: "desc" } },
     });
+    // Las etiquetas de factor se repiten mucho: se normaliza cada una una sola vez
+    const claveFactor = memorizar(claveNombre);
     const coincidencias = filas
-      .filter((e) => !programa || claveNombre(e.programa).includes(programa))
       .map((e) => ({ codigo: e.codigo, programa: e.programa, semestre: e.semestre, puntaje: e.evaluacion!.puntaje, nivel: e.evaluacion!.nivel, factores: factoresDe(e.evaluacion!.factores).map((f) => f.etiqueta) }))
-      .filter((e) => !factor || e.factores.some((f) => claveNombre(f).includes(factor)));
+      .filter((e) => !factor || e.factores.some((f) => claveFactor(f).includes(factor)));
     return { total: coincidencias.length, mostrados: Math.min(limite, coincidencias.length), estudiantes: coincidencias.slice(0, limite) };
   }
 
   private async detalle(codigo: string) {
-    const d = await new ServicioEstudiantes().detalle(codigo.trim());
+    const d = await this.estudiantes.detalle(codigo.trim());
     if (!d) return { error: `No existe un estudiante con el código ${codigo}.` };
     return {
       codigo: d.codigo,

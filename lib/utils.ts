@@ -6,31 +6,32 @@ export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
 
-const formatoPesos = new Intl.NumberFormat("es-CO", {
-  style: "currency",
-  currency: "COP",
-  maximumFractionDigits: 0,
-});
 
-/** $ 1.234.567 */
-export function formatoCOP(valor: number): string {
-  return formatoPesos.format(Math.round(valor));
+/** Quita los parámetros vacíos de una URL (un filtro sin valor equivale a no filtrar) */
+export function sinVacios(parametros: Iterable<[string, string | undefined]>): Record<string, string> {
+  const r: Record<string, string> = {};
+  for (const [clave, valor] of parametros) if (valor !== undefined && valor !== "") r[clave] = valor;
+  return r;
 }
 
-/** Formato compacto para ejes y tarjetas: $1,2 M / $1.200 M / $350 mil */
-export function formatoCOPCompacto(valor: number): string {
-  const abs = Math.abs(valor);
-  const signo = valor < 0 ? "-" : "";
-  // Millones también por encima de mil millones ("$1.200 M"): más corto y legible en los ejes
-  if (abs >= 1_000_000) return `${signo}$${(abs / 1_000_000).toLocaleString("es-CO", { maximumFractionDigits: abs >= 100_000_000 ? 0 : 1 })} M`;
-  if (abs >= 1_000) return `${signo}$${Math.round(abs / 1_000).toLocaleString("es-CO")} mil`;
-  return `${signo}$${Math.round(abs)}`;
+/** Guarda el resultado de una función de un argumento para no recalcularlo con el mismo valor */
+export function memorizar<A, R>(fn: (a: A) => R): (a: A) => R {
+  const cache = new Map<A, R>();
+  return (a) => {
+    if (!cache.has(a)) cache.set(a, fn(a));
+    return cache.get(a) as R;
+  };
 }
 
-export function formatoPct(valor: number, decimales = 1): string {
-  return `${valor.toLocaleString("es-CO", { minimumFractionDigits: decimales, maximumFractionDigits: decimales })}%`;
-}
-
-export function formatoNumero(valor: number): string {
-  return valor.toLocaleString("es-CO");
+/**
+ * Decodifica un segmento de la URL (p. ej. el código de un estudiante). Si el texto no es una
+ * secuencia válida (un "%" suelto), decodeURIComponent lanza URIError y la ruta respondía 500;
+ * aquí se devuelve el texto tal cual y la validación posterior decide.
+ */
+export function decodificarSegmento(segmento: string): string {
+  try {
+    return decodeURIComponent(segmento);
+  } catch {
+    return segmento;
+  }
 }

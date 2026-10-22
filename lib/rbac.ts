@@ -1,16 +1,17 @@
-import type { Rol } from "./roles";
+import { ROLES, type Rol } from "./roles";
 
 /**
  * Control de acceso por rol (RBAC) — fuente única de verdad.
- * La usan: el middleware (rutas), el menú lateral y los endpoints de la API.
+ * La usan: el middleware (rutas), el layout y los endpoints de la API.
  * Es una lista de prefijos: gana el prefijo más largo que coincida.
  *
  * Habeas data (Ley 1581/2012): solo el personal autorizado (ADMIN y BIENESTAR) inicia sesión;
  * cargar o borrar información y gestionar cuentas es exclusivo del administrador.
  */
-export const TODOS: Rol[] = ["ADMIN", "BIENESTAR"];
+/** Los dos roles: es la misma lista de lib/roles.ts, con un nombre que se lee bien en las reglas */
+export const TODOS: readonly Rol[] = ROLES;
 
-export const REGLAS_RUTAS: { prefijo: string; roles: Rol[] }[] = [
+export const REGLAS_RUTAS: readonly { readonly prefijo: string; readonly roles: readonly Rol[] }[] = [
   { prefijo: "/inicio", roles: TODOS },
   { prefijo: "/estudiantes", roles: TODOS },
   { prefijo: "/agente", roles: TODOS },
@@ -27,15 +28,15 @@ export const REGLAS_RUTAS: { prefijo: string; roles: Rol[] }[] = [
 /** Prefijos que exigen sesión (los usa el matcher del middleware) */
 export const PREFIJOS_PROTEGIDOS = REGLAS_RUTAS.map((r) => r.prefijo);
 
+/** Reglas ordenadas una sola vez del prefijo más largo al más corto: la primera que coincide es la más específica */
+const REGLAS_POR_ESPECIFICIDAD = [...REGLAS_RUTAS].sort((a, b) => b.prefijo.length - a.prefijo.length);
+
 /** ¿Puede este rol abrir esta ruta? Rutas sin regla => solo requieren sesión. */
 export function puedeAcceder(pathname: string, rol: Rol): boolean {
-  const regla = REGLAS_RUTAS.filter((r) => pathname === r.prefijo || pathname.startsWith(`${r.prefijo}/`)).sort(
-    (a, b) => b.prefijo.length - a.prefijo.length,
-  )[0];
+  // El middleware llama esto en cada petición: un recorrido lineal, sin filtrar ni ordenar cada vez
+  const regla = REGLAS_POR_ESPECIFICIDAD.find((r) => pathname === r.prefijo || pathname.startsWith(`${r.prefijo}/`));
   return regla ? regla.roles.includes(rol) : true;
 }
 
 /** Página de inicio después de iniciar sesión (igual para los dos roles) */
-export function rutaInicial(_rol: Rol): string {
-  return "/inicio";
-}
+export const RUTA_INICIAL = "/inicio";

@@ -1,10 +1,11 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { esRol } from "@/lib/roles";
-import { ERROR_CUENTA_BLOQUEADA, ESTADO_LIMPIO, consultarBloqueo, registrarFallo } from "@/lib/seguridad/bloqueo";
+import { ERROR_CUENTA_BLOQUEADA, ESTADO_LIMPIO, consultarBloqueo } from "@/lib/seguridad/bloqueo";
+import { registrarIntentoFallido } from "@/lib/seguridad/intentos";
+import { huellaContrasena, verificarContrasena } from "@/lib/seguridad/contrasenas";
 import { revalidarSesion } from "@/lib/seguridad/sesion";
 
 const credencialesSchema = z.object({
@@ -36,16 +37,18 @@ export const authOptions: NextAuthOptions = {
         const usuario = await prisma.usuario.findUnique({
           where: { email: parsed.data.email.toLowerCase().trim() },
         });
-        // Mismo resultado para correo inexistente o cuenta inactiva: no se revela qué cuentas existen
-        if (!usuario || !usuario.activo) return null;
+        // Mismo resultado Y MISMO TIEMPO para correo inexistente o cuenta inactiva: no se revela qué cuentas existen
+        if (!usuario || !usuario.activo) {
+          await verificarContrasena(parsed.data.password, null);
+          return null;
+        }
 
         // Cuenta bloqueada por intentos fallidos: ni siquiera se verifica la contraseña
         if (consultarBloqueo(usuario).bloqueado) throw new Error(ERROR_CUENTA_BLOQUEADA);
 
-        const coincide = await bcrypt.compare(parsed.data.password, usuario.passwordHash);
+        const coincide = await verificarContrasena(parsed.data.password, usuario.passwordHash);
         if (!coincide || !esRol(usuario.rol)) {
-          const nuevo = registrarFallo(usuario);
-          await prisma.usuario.update({ where: { id: usuario.id }, data: nuevo });
+          const nuevo = await registrarIntentoFallido(prisma, usuario.id);
           if (nuevo.bloqueadoHasta) throw new Error(ERROR_CUENTA_BLOQUEADA);
           return null;
         }
@@ -57,6 +60,7 @@ export const authOptions: NextAuthOptions = {
           name: usuario.nombre,
           email: usuario.email,
           rol: usuario.rol,
+          huella: huellaContrasena(usuario.passwordHash),
         };
       },
     }),
@@ -66,17 +70,19 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.uid = user.id;
         token.rol = user.rol;
+        token.huella = user.huella;
         token.revocada = false;
         return token;
       }
       if (!token.uid) return token;
-      // Revalidación en cada petición del servidor: desactivar una cuenta o cambiarle el rol
-      // surte efecto de inmediato, sin esperar a que el JWT expire (ver lib/seguridad/sesion.ts)
+      // Revalidación en cada petición del servidor: desactivar una cuenta, cambiarle el rol o
+      // restablecer su contraseña surte efecto de inmediato, sin esperar a que el JWT expire
+      // (ver lib/seguridad/sesion.ts)
       const cuenta = await prisma.usuario.findUnique({
         where: { id: token.uid },
-        select: { activo: true, rol: true },
+        select: { activo: true, rol: true, passwordHash: true },
       });
-      const r = revalidarSesion(cuenta);
+      const r = revalidarSesion(cuenta && { activo: cuenta.activo, rol: cuenta.rol, huella: huellaContrasena(cuenta.passwordHash) }, token.huella);
       if (!r.valida) return { ...token, revocada: true };
       return { ...token, rol: r.rol, revocada: false };
     },

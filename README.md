@@ -151,6 +151,19 @@ flowchart LR
 | `lib/datos-abiertos*.ts` | Filtro, depuración y resumen de los datos del MEN |
 | `prisma` | Esquema, migraciones y cuenta inicial del administrador |
 
+### 5.1 Patrones de diseño y estructuras de datos
+
+| Patrón o estructura | Dónde | Para qué |
+|---|---|---|
+| **Strategy** + fábrica | `services/riesgo/calculadora.ts` | Dos formas de calcular el riesgo (puntaje por factores o modelo entrenado) detrás de la misma interfaz `CalculadoraRiesgo`; la lista, la ficha y el agente no saben cuál está vigente. |
+| **Command** (registro tipado) | `services/agente/herramientas.ts` | Cada herramienta del agente tiene su ejecutor en un `Record<NombreHerramienta, Ejecutor>`: TypeScript obliga a implementar todas las que se declaran. |
+| **Inyección de dependencias** por constructor | `services/*` | Cada servicio recibe sus dependencias con un valor por defecto (`new ServicioCarga(evaluacion)`), así las pruebas pasan dobles sin tocar la base de datos. |
+| **Unidad de trabajo** | `ServicioCarga.procesar` | Guardar, entrenar y recalcular van en una transacción: o se guarda todo o nada. |
+| **Funciones puras** para las reglas | `lib/seguridad/*`, `services/usuarios/reglas.ts`, `services/riesgo/*` | Bloqueo por intentos, revalidación de la sesión, último administrador, puntaje y métricas: se prueban sin servidor ni base de datos. |
+| **Map / Set** | lector, variables, agente | Códigos repetidos detectados en O(1) con un `Map`, variables indexadas por clave y códigos sin repetir con `Set`. |
+| **Ordenamiento + barrido** | `services/riesgo/metricas.ts` | El AUC se calcula ordenando una vez (O(n log n)) en vez de comparar todos los pares (O(n²)). |
+| **Bloqueos consultivos** de PostgreSQL | `lib/bloqueos.ts` | Las cargas no se mezclan (la segunda recibe 409) y la regla del último administrador no tiene carreras. |
+
 **Modelo de datos** (5 tablas):
 
 ![Diagrama entidad-relación](docs/diagrama-er.png)
@@ -196,8 +209,11 @@ La migración `20261019000000_simplificacion_datos_reales` **borra las tablas de
 ## 9. Seguridad y Ley 1581 de 2012
 
 - Solo personal autorizado inicia sesión, con contraseñas bcrypt.
-- Hay bloqueo de 15 minutos tras 5 intentos fallidos.
-- La sesión es un JWT de 8 horas, revalidado contra la base de datos en cada petición: desactivar una cuenta corta el acceso de inmediato.
+- Hay bloqueo de 15 minutos tras 5 intentos fallidos. El contador se actualiza con bloqueo de fila, así que muchos intentos a la vez no lo saltan.
+- El inicio de sesión tarda lo mismo exista o no el correo (se compara contra un hash ficticio), para no revelar qué cuentas existen.
+- La sesión es un JWT de 8 horas, revalidado contra la base de datos en cada petición: desactivar una cuenta, cambiarle el rol o restablecer su contraseña surte efecto de inmediato.
+- Cabeceras HTTP contra clickjacking y `Cache-Control: no-store` en la API; los cuerpos JSON y los archivos tienen tamaño máximo.
+- Los textos que vienen de los archivos tienen largo máximo y se tratan como datos (no como instrucciones) en los mensajes al agente.
 - Los permisos se verifican tres veces: en el middleware, en el layout y en cada endpoint.
 - A la IA no se envían datos que identifiquen a la persona.
 - El borrado total de estudiantes es exclusivo del administrador y pide confirmación escrita.
@@ -213,19 +229,22 @@ npm run lint
 Las pruebas cubren:
 
 - **Depuración de los datos del MEN:** los totales reales de Pasto, de 2.088 a 2.250 por año, y la suma de las sedes igual al total nacional.
-- **Lector de archivos:** CSV, Excel, rangos, sí/no y duplicados.
+- **Lector de archivos:** CSV (comillas sueltas o sin cerrar), Excel (porcentajes y miles de filas en tiempo lineal), rangos, sí/no, duplicados y largo de los textos.
 - **Cálculo del riesgo:** el puntaje por factores, y que el modelo aprende y solo se activa con AUC ≥ 0,70.
-- **Agente:** cliente de Gemini y ciclo de function calling, con respuestas simuladas.
-- **Permisos y seguridad:** los dos roles, las reglas de cuentas y la sesión.
+- **Agente:** cliente de Gemini (plazo total, cuerpos que no llegan, respuestas cortadas, errores de clave) y ciclo de function calling, con respuestas simuladas; historial del chat.
+- **Permisos y seguridad:** los dos roles, las reglas de cuentas, la sesión (incluido el cambio de contraseña), el hash ficticio, el tamaño de los cuerpos y que el middleware proteja exactamente las rutas con regla.
 
 ## 11. Historial de desarrollo (Git)
 
 Cada funcionalidad se desarrolló en su propia rama y se integró a `main` con `--no-ff`. Los mensajes siguen *Conventional Commits* en español (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`). Etiquetas:
 
 - `v0.1.0-fase1`, `v0.2.0-fase2` y `v0.3.0-fase3`: versión con datos simulados.
-- `v0.4.0`: esta versión, solo con datos reales y el agente de IA.
+- `v0.4.0`: solo datos reales y el agente de IA.
+- `v0.5.0`: diseño editorial.
+- `v0.6.0`: revisión profunda del código en cinco vueltas (arquitectura, clean code, estructuras de datos, patrones y robustez).
 
 ```bash
 git log --oneline --graph --decorate
 git log --merges --oneline v0.3.1..v0.4.0   # qué cambió en la simplificación
+git log --oneline v0.5.0..v0.6.0             # la revisión profunda, commit por commit
 ```

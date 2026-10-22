@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { enviarJson } from "@/lib/cliente-api";
+import { formatoNumero } from "@/lib/formato";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
@@ -20,7 +21,7 @@ export function BorrarDatos({ total }: { total: number }) {
     setCargando(true);
     try {
       const r = await enviarJson<{ estudiantes: number }>("/api/estudiantes", "DELETE");
-      setMensaje({ tipo: "success", texto: `Se borraron ${r.estudiantes.toLocaleString("es-CO")} estudiantes y sus evaluaciones.` });
+      setMensaje({ tipo: "success", texto: `Se borraron ${formatoNumero(r.estudiantes)} estudiantes y sus evaluaciones.` });
       setAbierto(false);
       setConfirmacion("");
       router.refresh();
@@ -41,7 +42,7 @@ export function BorrarDatos({ total }: { total: number }) {
       ) : (
         <div className="space-y-3 rounded-lg border border-riesgo-alto-borde bg-riesgo-alto-fondo p-4">
           <p className="text-sm text-riesgo-alto">
-            Se borrarán los {total.toLocaleString("es-CO")} estudiantes, sus evaluaciones, el historial de cargas y los modelos entrenados. Las cuentas de usuario no se tocan.
+            Se borrarán los {formatoNumero(total)} estudiantes, sus evaluaciones, el historial de cargas y los modelos entrenados. Las cuentas de usuario no se tocan.
             Escribe <strong>BORRAR</strong> para confirmar.
           </p>
           <div className="flex flex-wrap gap-2">

@@ -1,15 +1,29 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { ErrorApi } from "@/lib/api";
-import { ServicioEvaluacion } from "@/services/riesgo/ServicioEvaluacion";
+import { ErrorApi } from "@/lib/errores";
+import { intentarBloquear } from "@/lib/bloqueos";
+import { ServicioEvaluacion, type ClienteBD } from "@/services/riesgo/ServicioEvaluacion";
 import { leerExcel } from "./excel";
 import { validarTabla, type ErrorFila, type EstudianteArchivo, type ResultadoLectura } from "./lector";
-import { parsearCSV } from "./csv";
+import { ErrorCSV, parsearCSV } from "./csv";
+import { TAMANO_MAXIMO, TAMANO_MAXIMO_MB } from "./limites";
 
-export const TAMANO_MAXIMO = 5 * 1024 * 1024; // 5 MB
+/** Filas por INSERT: con 19 columnas son unos 9.500 parámetros, lejos del límite de PostgreSQL (65.535) */
 const LOTE = 500;
+/** Errores que se guardan y se devuelven (el total se informa aparte) */
 const MAX_ERRORES_GUARDADOS = 200;
+const MAX_LARGO_NOMBRE_ARCHIVO = 200;
+
+/** La carga de varios miles de estudiantes con su recálculo cabe holgada en el límite de 60 s de la ruta */
+const OPCIONES_TRANSACCION = { maxWait: 15_000, timeout: 50_000 };
+
+/** Las cargas y el borrado total no se ejecutan a la vez: si hay otra en curso se responde 409 */
+async function tomarDatos(tx: ClienteBD): Promise<void> {
+  if (!(await intentarBloquear(tx, "DATOS"))) {
+    throw new ErrorApi(409, "Hay otra carga o un borrado en curso. Espera a que termine y vuelve a intentarlo.");
+  }
+}
 
 export interface ResumenCarga {
   archivo: string;
@@ -38,19 +52,26 @@ export async function leerArchivo(nombre: string, buffer: ArrayBuffer): Promise<
       throw new ErrorApi(400, "No se pudo leer el archivo de Excel. Guárdalo como .xlsx o como CSV e inténtalo de nuevo.");
     }
   }
-  if (ext === "csv" || ext === "txt") return validarTabla(parsearCSV(decodificarTexto(buffer)));
+  if (ext === "csv" || ext === "txt") {
+    try {
+      return validarTabla(parsearCSV(decodificarTexto(buffer)));
+    } catch (e) {
+      if (e instanceof ErrorCSV) throw new ErrorApi(400, e.message);
+      throw e;
+    }
+  }
   throw new ErrorApi(400, "Formato no admitido. Sube un archivo .xlsx o .csv (puedes partir de la plantilla).");
 }
 
 /** Inserta o actualiza por código en lotes con un solo INSERT ... ON CONFLICT (rápido incluso con miles de filas) */
-async function guardar(estudiantes: EstudianteArchivo[], cargaId: string): Promise<{ nuevos: number; actualizados: number }> {
+async function guardar(tx: ClienteBD, estudiantes: EstudianteArchivo[], cargaId: string): Promise<{ nuevos: number; actualizados: number }> {
   let nuevos = 0;
   for (let i = 0; i < estudiantes.length; i += LOTE) {
     const lote = estudiantes.slice(i, i + LOTE);
     const filas = lote.map(
       (e) => Prisma.sql`(${randomUUID()}, ${e.codigo}, ${e.nombre}, ${e.programa}, ${e.semestre}, ${e.promedio}, ${e.materiasPerdidas}, ${e.asistencia}, ${e.estrato}, ${e.trabaja}, ${e.apoyoFinanciero}, ${e.moraMatricula}, ${e.puntajeSaber11}, ${e.edad}, ${e.estado}::"EstadoEstudiante", ${e.periodo}, ${cargaId}, NOW(), NOW())`,
     );
-    const r = await prisma.$queryRaw<{ nuevo: boolean }[]>`
+    const r = await tx.$queryRaw<{ nuevo: boolean }[]>`
       INSERT INTO "estudiantes" ("id", "codigo", "nombre", "programa", "semestre", "promedio", "materiasPerdidas", "asistencia", "estrato", "trabaja", "apoyoFinanciero", "moraMatricula", "puntajeSaber11", "edad", "estado", "periodo", "cargaId", "creadoEn", "actualizadoEn")
       VALUES ${Prisma.join(filas)}
       ON CONFLICT ("codigo") DO UPDATE SET
@@ -66,47 +87,36 @@ async function guardar(estudiantes: EstudianteArchivo[], cargaId: string): Promi
 }
 
 export class ServicioCarga {
-  private readonly evaluacion = new ServicioEvaluacion();
+  constructor(private readonly evaluacion: ServicioEvaluacion = new ServicioEvaluacion()) {}
 
   async procesar(nombre: string, buffer: ArrayBuffer, usuarioId: string): Promise<ResumenCarga> {
     if (buffer.byteLength === 0) throw new ErrorApi(400, "El archivo está vacío.");
-    if (buffer.byteLength > TAMANO_MAXIMO) throw new ErrorApi(413, "El archivo supera los 5 MB.");
+    if (buffer.byteLength > TAMANO_MAXIMO) throw new ErrorApi(413, `El archivo supera los ${TAMANO_MAXIMO_MB} MB.`);
     const lectura = await leerArchivo(nombre, buffer);
+    // Filas de datos leídas: las válidas más las rechazadas (el error de la fila 1 es del encabezado)
     const filas = lectura.estudiantes.length + lectura.errores.filter((e) => e.fila > 1).length;
+    const errores = lectura.errores.slice(0, MAX_ERRORES_GUARDADOS);
+    const base = { archivo: nombre, filas, errores, totalErrores: lectura.errores.length, ignoradas: lectura.ignoradas };
 
     if (lectura.estudiantes.length === 0) {
-      return {
-        archivo: nombre,
-        filas,
-        nuevos: 0,
-        actualizados: 0,
-        errores: lectura.errores.slice(0, MAX_ERRORES_GUARDADOS),
-        totalErrores: lectura.errores.length,
-        ignoradas: lectura.ignoradas,
-        modelo: { estado: "INSUFICIENTE", motivo: "No se cargó ningún estudiante." },
-        evaluados: 0,
-      };
+      return { ...base, nuevos: 0, actualizados: 0, modelo: { estado: "INSUFICIENTE", motivo: "No se cargó ningún estudiante." }, evaluados: 0 };
     }
 
-    const carga = await prisma.carga.create({
-      data: { archivo: nombre.slice(0, 200), filas, nuevos: 0, actualizados: 0, errores: lectura.errores.slice(0, MAX_ERRORES_GUARDADOS) as unknown as Prisma.InputJsonValue, usuarioId },
-    });
-    const { nuevos, actualizados } = await guardar(lectura.estudiantes, carga.id);
-    await prisma.carga.update({ where: { id: carga.id }, data: { nuevos, actualizados } });
+    // Unidad de trabajo: guardar, entrenar y recalcular van en UNA transacción. Si algo falla a mitad
+    // de camino (un lote, el entrenamiento), no queda una carga a medias. El bloqueo consultivo hace que
+    // dos cargas simultáneas (o una carga y un borrado) no se mezclen: la segunda recibe 409.
+    return prisma.$transaction(async (tx) => {
+      await tomarDatos(tx);
+      const carga = await tx.carga.create({
+        data: { archivo: nombre.slice(0, MAX_LARGO_NOMBRE_ARCHIVO), filas, nuevos: 0, actualizados: 0, errores: errores as unknown as Prisma.InputJsonValue, usuarioId },
+      });
+      const { nuevos, actualizados } = await guardar(tx, lectura.estudiantes, carga.id);
+      await tx.carga.update({ where: { id: carga.id }, data: { nuevos, actualizados } });
 
-    const modelo = await this.evaluacion.entrenar();
-    const { evaluados } = await this.evaluacion.recalcular();
-    return {
-      archivo: nombre,
-      filas,
-      nuevos,
-      actualizados,
-      errores: lectura.errores.slice(0, MAX_ERRORES_GUARDADOS),
-      totalErrores: lectura.errores.length,
-      ignoradas: lectura.ignoradas,
-      modelo,
-      evaluados,
-    };
+      const modelo = await this.evaluacion.entrenar(tx);
+      const { evaluados } = await this.evaluacion.recalcular(tx);
+      return { ...base, nuevos, actualizados, modelo, evaluados };
+    }, OPCIONES_TRANSACCION);
   }
 
   async historial(limite = 20) {
@@ -125,12 +135,13 @@ export class ServicioCarga {
 
   /** Borra TODOS los estudiantes, sus evaluaciones, las cargas y los modelos (para empezar de cero) */
   async borrarTodo(): Promise<{ estudiantes: number }> {
-    const [, r] = await prisma.$transaction([
-      prisma.evaluacion.deleteMany(),
-      prisma.estudiante.deleteMany(),
-      prisma.carga.deleteMany(),
-      prisma.modeloRiesgo.deleteMany(),
-    ]);
-    return { estudiantes: r.count };
+    return prisma.$transaction(async (tx) => {
+      await tomarDatos(tx);
+      await tx.evaluacion.deleteMany();
+      const r = await tx.estudiante.deleteMany();
+      await tx.carga.deleteMany();
+      await tx.modeloRiesgo.deleteMany();
+      return { estudiantes: r.count };
+    }, OPCIONES_TRANSACCION);
   }
 }

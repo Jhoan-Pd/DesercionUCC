@@ -1,12 +1,15 @@
-import type { Estudiante, Evaluacion, Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
+import type { Evaluacion, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { puntajePorFactores, type FactorRiesgo, type ResultadoRiesgo } from "./factores";
-import { definicionModeloSchema, entrenarModelo, predecirConModelo, MINIMO_ENTRENAMIENTO, type DefinicionModelo, type MetricasEntrenamiento } from "./modelo";
-import type { DatosEstudiante } from "./variables";
+import { crearCalculadora } from "./calculadora";
+import type { MetodoRiesgo, ResultadoRiesgo } from "./factores";
+import { definicionModeloSchema, entrenarModelo, MINIMO_ENTRENAMIENTO, type DefinicionModelo, type MetricasEntrenamiento } from "./modelo";
+import { factoresDe } from "./persistencia";
+import { datosDe } from "./variables";
 
 export interface EstadoModelo {
   /** Método con el que se calcula hoy el riesgo */
-  metodo: "FACTORES" | "MODELO";
+  metodo: MetodoRiesgo;
   version: string | null;
   metricas: MetricasEntrenamiento | null;
   /** Explicación para mostrar en pantalla */
@@ -15,41 +18,24 @@ export interface EstadoModelo {
   minimo: number;
 }
 
-export function datosDe(e: Pick<Estudiante, "semestre" | "promedio" | "materiasPerdidas" | "asistencia" | "estrato" | "trabaja" | "apoyoFinanciero" | "moraMatricula" | "puntajeSaber11" | "edad">): DatosEstudiante {
-  return {
-    semestre: e.semestre,
-    promedio: e.promedio,
-    materiasPerdidas: e.materiasPerdidas,
-    asistencia: e.asistencia,
-    estrato: e.estrato,
-    trabaja: e.trabaja,
-    apoyoFinanciero: e.apoyoFinanciero,
-    moraMatricula: e.moraMatricula,
-    puntajeSaber11: e.puntajeSaber11,
-    edad: e.edad,
-  };
-}
-
-/** Calcula el riesgo con el modelo activo si existe; si no, con el puntaje por factores */
-export function evaluar(datos: DatosEstudiante, modelo: DefinicionModelo | null): ResultadoRiesgo {
-  return modelo ? predecirConModelo(modelo, datos) : puntajePorFactores(datos);
-}
-
 /** Firma comparable de un resultado (JSONB no conserva el orden de las claves, por eso se arma a mano) */
 function firma(r: Pick<Evaluacion, "puntaje" | "nivel" | "metodo" | "modeloVersion" | "factores" | "faltantes"> | ResultadoRiesgo): string {
-  const factores = (Array.isArray(r.factores) ? (r.factores as unknown as FactorRiesgo[]) : []).map((f) => [f.clave, f.etiqueta, f.puntos, f.detalle]);
+  const factores = factoresDe(r.factores).map((f) => [f.clave, f.etiqueta, f.puntos, f.detalle]);
   return JSON.stringify([r.puntaje, r.nivel, r.metodo, r.modeloVersion ?? null, factores, [...r.faltantes].sort()]);
 }
 
 const LOTE = 1000;
+
+/** Cliente de Prisma o transacción en curso (los dos tienen las mismas consultas) */
+export type ClienteBD = Prisma.TransactionClient;
 
 /**
  * Calcula y guarda el riesgo de los estudiantes ACTIVOS. Si el resultado de un estudiante no cambió,
  * su evaluación (y la explicación ya redactada por el agente) se conserva tal cual.
  */
 export class ServicioEvaluacion {
-  async modeloActivo(): Promise<DefinicionModelo | null> {
-    const fila = await prisma.modeloRiesgo.findFirst({ where: { activo: true }, orderBy: { creadoEn: "desc" } });
+  async modeloActivo(db: ClienteBD = prisma): Promise<DefinicionModelo | null> {
+    const fila = await db.modeloRiesgo.findFirst({ where: { activo: true }, orderBy: { creadoEn: "desc" } });
     if (!fila) return null;
     const def = definicionModeloSchema.safeParse(fila.definicion);
     return def.success ? (def.data as DefinicionModelo) : null;
@@ -76,41 +62,39 @@ export class ServicioEvaluacion {
   /**
    * Entrena con los estudiantes RETIRADOS y GRADUADOS. Si el modelo pasa la evaluación se activa
    * (y desactiva los anteriores); si no pasa, se guarda inactivo para dejar constancia y se vuelve
-   * al puntaje por factores.
+   * al puntaje por factores. Recibe la transacción de la carga: o se guarda todo, o nada.
    */
-  async entrenar(fecha = new Date()): Promise<{ estado: "INSUFICIENTE" | "ACTIVADO" | "NO_ACTIVADO"; motivo: string }> {
-    const conResultado = await prisma.estudiante.findMany({ where: { estado: { in: ["RETIRADO", "GRADUADO"] } } });
-    const version = `ucc-${fecha.toISOString().slice(0, 19).replace(/[-:T]/g, "")}`;
+  async entrenar(tx: ClienteBD, fecha = new Date()): Promise<{ estado: "INSUFICIENTE" | "ACTIVADO" | "NO_ACTIVADO"; motivo: string }> {
+    const conResultado = await tx.estudiante.findMany({ where: { estado: { in: ["RETIRADO", "GRADUADO"] } } });
+    // La versión es única: con dos cargas seguidas en el mismo segundo, el nombre solo con la hora
+    // chocaba (P2002) y la segunda carga entera se deshacía. El sufijo aleatorio lo evita.
+    const version = `ucc-${fecha.toISOString().slice(0, 19).replace(/[-:T]/g, "")}-${randomUUID().slice(0, 4)}`;
     const r = entrenarModelo(
       conResultado.map((e) => ({ codigo: e.codigo, datos: datosDe(e), retirado: e.estado === "RETIRADO" })),
       version,
       fecha,
     );
-    if (r.estado === "INSUFICIENTE") {
-      await prisma.modeloRiesgo.updateMany({ where: { activo: true }, data: { activo: false } });
-      return { estado: "INSUFICIENTE", motivo: r.motivo };
-    }
-    await prisma.$transaction([
-      prisma.modeloRiesgo.updateMany({ where: { activo: true }, data: { activo: false } }),
-      prisma.modeloRiesgo.create({
-        data: {
-          version,
-          definicion: r.definicion as unknown as Prisma.InputJsonValue,
-          metricas: { ...r.metricas, motivo: r.motivo } as unknown as Prisma.InputJsonValue,
-          activo: r.activable,
-        },
-      }),
-    ]);
+    await tx.modeloRiesgo.updateMany({ where: { activo: true }, data: { activo: false } });
+    if (r.estado === "INSUFICIENTE") return { estado: "INSUFICIENTE", motivo: r.motivo };
+    await tx.modeloRiesgo.create({
+      data: {
+        version,
+        definicion: r.definicion as unknown as Prisma.InputJsonValue,
+        metricas: { ...r.metricas, motivo: r.motivo } as unknown as Prisma.InputJsonValue,
+        activo: r.activable,
+      },
+    });
     return { estado: r.activable ? "ACTIVADO" : "NO_ACTIVADO", motivo: r.motivo };
   }
 
-  async recalcular(): Promise<{ evaluados: number; cambiaron: number }> {
-    const modelo = await this.modeloActivo();
-    const estudiantes = await prisma.estudiante.findMany({ where: { estado: "ACTIVO" }, include: { evaluacion: true } });
+  /** Recalcula el riesgo de los estudiantes activos dentro de la transacción recibida */
+  async recalcular(tx: ClienteBD): Promise<{ evaluados: number; cambiaron: number }> {
+    const calculadora = crearCalculadora(await this.modeloActivo(tx));
+    const estudiantes = await tx.estudiante.findMany({ where: { estado: "ACTIVO" }, include: { evaluacion: true } });
 
     const nuevas: Prisma.EvaluacionCreateManyInput[] = [];
     for (const e of estudiantes) {
-      const r = evaluar(datosDe(e), modelo);
+      const r = calculadora.evaluar(datosDe(e));
       if (e.evaluacion && firma(e.evaluacion) === firma(r)) continue;
       nuevas.push({
         estudianteId: e.id,
@@ -124,10 +108,11 @@ export class ServicioEvaluacion {
     }
     for (let i = 0; i < nuevas.length; i += LOTE) {
       const lote = nuevas.slice(i, i + LOTE);
-      await prisma.$transaction([prisma.evaluacion.deleteMany({ where: { estudianteId: { in: lote.map((n) => n.estudianteId) } } }), prisma.evaluacion.createMany({ data: lote })]);
+      await tx.evaluacion.deleteMany({ where: { estudianteId: { in: lote.map((n) => n.estudianteId) } } });
+      await tx.evaluacion.createMany({ data: lote });
     }
     // Quien ya no está activo (retirado o graduado) no necesita alerta
-    await prisma.evaluacion.deleteMany({ where: { estudiante: { estado: { not: "ACTIVO" } } } });
+    await tx.evaluacion.deleteMany({ where: { estudiante: { estado: { not: "ACTIVO" } } } });
     return { evaluados: estudiantes.length, cambiaron: nuevas.length };
   }
 }
