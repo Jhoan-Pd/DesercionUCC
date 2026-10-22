@@ -14,10 +14,13 @@ export interface FactorRiesgo {
   detalle: string;
 }
 
+/** Cómo se calculó el riesgo (coincide con el enum MetodoRiesgo de la base de datos) */
+export type MetodoRiesgo = "FACTORES" | "MODELO";
+
 export interface ResultadoRiesgo {
   puntaje: number;
   nivel: NivelRiesgo;
-  metodo: "FACTORES" | "MODELO";
+  metodo: MetodoRiesgo;
   modeloVersion: string | null;
   /** Solo los factores que suman (puntos > 0), de mayor a menor */
   factores: FactorRiesgo[];

@@ -1,4 +1,4 @@
-import { puntajePorFactores, type ResultadoRiesgo } from "./factores";
+import { puntajePorFactores, type MetodoRiesgo, type ResultadoRiesgo } from "./factores";
 import { predecirConModelo, type DefinicionModelo } from "./modelo";
 import type { DatosEstudiante } from "./variables";
 
@@ -8,7 +8,7 @@ import type { DatosEstudiante } from "./variables";
  * así que la lista, la ficha, el agente y la explicación funcionan igual con cualquiera.
  */
 export interface CalculadoraRiesgo {
-  readonly metodo: ResultadoRiesgo["metodo"];
+  readonly metodo: MetodoRiesgo;
   /** Versión del modelo (null para el puntaje por factores, que no se entrena) */
   readonly version: string | null;
   evaluar(datos: DatosEstudiante): ResultadoRiesgo;

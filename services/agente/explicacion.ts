@@ -1,4 +1,4 @@
-import type { FactorRiesgo, NivelRiesgo } from "@/services/riesgo/factores";
+import type { FactorRiesgo, MetodoRiesgo, NivelRiesgo } from "@/services/riesgo/factores";
 import { VARIABLE, describirValor, tieneValor, type ClaveVariable, type DatosEstudiante } from "@/services/riesgo/variables";
 import { ETIQUETA_NIVEL } from "@/services/riesgo/niveles";
 
@@ -34,7 +34,7 @@ export interface EntradaExplicacion {
   datos: DatosEstudiante;
   puntaje: number;
   nivel: NivelRiesgo;
-  metodo: "FACTORES" | "MODELO";
+  metodo: MetodoRiesgo;
   factores: FactorRiesgo[];
   faltantes: ClaveVariable[];
 }

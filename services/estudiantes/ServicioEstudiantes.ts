@@ -106,7 +106,7 @@ export class ServicioEstudiantes {
         ? {
             puntaje: ev.puntaje,
             nivel: ev.nivel,
-            metodo: ev.metodo as "FACTORES" | "MODELO",
+            metodo: ev.metodo,
             modeloVersion: ev.modeloVersion,
             factores: factoresDe(ev.factores).map((f) => ({ ...f, fuente: ev.metodo === "FACTORES" ? FUENTE_REGLA[f.clave] ?? null : null })),
             faltantes: faltantesDe(ev.faltantes),

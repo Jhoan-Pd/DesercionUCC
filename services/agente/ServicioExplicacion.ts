@@ -38,7 +38,7 @@ export class ServicioExplicacion {
       datos: datosDe(e),
       puntaje: ev.puntaje,
       nivel: ev.nivel,
-      metodo: ev.metodo === "MODELO" ? "MODELO" : "FACTORES",
+      metodo: ev.metodo,
       factores: factoresDe(ev.factores),
       faltantes: faltantesDe(ev.faltantes),
     };

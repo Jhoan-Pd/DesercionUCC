@@ -1,14 +1,14 @@
 import type { Evaluacion, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { crearCalculadora } from "./calculadora";
-import type { ResultadoRiesgo } from "./factores";
+import type { MetodoRiesgo, ResultadoRiesgo } from "./factores";
 import { definicionModeloSchema, entrenarModelo, MINIMO_ENTRENAMIENTO, type DefinicionModelo, type MetricasEntrenamiento } from "./modelo";
 import { factoresDe } from "./persistencia";
 import { datosDe } from "./variables";
 
 export interface EstadoModelo {
   /** Método con el que se calcula hoy el riesgo */
-  metodo: "FACTORES" | "MODELO";
+  metodo: MetodoRiesgo;
   version: string | null;
   metricas: MetricasEntrenamiento | null;
   /** Explicación para mostrar en pantalla */
