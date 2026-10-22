@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ErrorApi } from "@/lib/errores";
-import { bloquear } from "@/lib/bloqueos";
+import { intentarBloquear } from "@/lib/bloqueos";
 import { ServicioEvaluacion, type ClienteBD } from "@/services/riesgo/ServicioEvaluacion";
 import { leerExcel } from "./excel";
 import { validarTabla, type ErrorFila, type EstudianteArchivo, type ResultadoLectura } from "./lector";
@@ -17,6 +17,13 @@ const MAX_LARGO_NOMBRE_ARCHIVO = 200;
 
 /** La carga de varios miles de estudiantes con su recálculo cabe holgada en el límite de 60 s de la ruta */
 const OPCIONES_TRANSACCION = { maxWait: 15_000, timeout: 50_000 };
+
+/** Las cargas y el borrado total no se ejecutan a la vez: si hay otra en curso se responde 409 */
+async function tomarDatos(tx: ClienteBD): Promise<void> {
+  if (!(await intentarBloquear(tx, "DATOS"))) {
+    throw new ErrorApi(409, "Hay otra carga o un borrado en curso. Espera a que termine y vuelve a intentarlo.");
+  }
+}
 
 export interface ResumenCarga {
   archivo: string;
@@ -97,9 +104,9 @@ export class ServicioCarga {
 
     // Unidad de trabajo: guardar, entrenar y recalcular van en UNA transacción. Si algo falla a mitad
     // de camino (un lote, el entrenamiento), no queda una carga a medias. El bloqueo consultivo hace que
-    // dos cargas simultáneas (o una carga y un borrado) se ejecuten una detrás de otra.
+    // dos cargas simultáneas (o una carga y un borrado) no se mezclen: la segunda recibe 409.
     return prisma.$transaction(async (tx) => {
-      await bloquear(tx, "DATOS");
+      await tomarDatos(tx);
       const carga = await tx.carga.create({
         data: { archivo: nombre.slice(0, MAX_LARGO_NOMBRE_ARCHIVO), filas, nuevos: 0, actualizados: 0, errores: errores as unknown as Prisma.InputJsonValue, usuarioId },
       });
@@ -129,7 +136,7 @@ export class ServicioCarga {
   /** Borra TODOS los estudiantes, sus evaluaciones, las cargas y los modelos (para empezar de cero) */
   async borrarTodo(): Promise<{ estudiantes: number }> {
     return prisma.$transaction(async (tx) => {
-      await bloquear(tx, "DATOS");
+      await tomarDatos(tx);
       await tx.evaluacion.deleteMany();
       const r = await tx.estudiante.deleteMany();
       await tx.carga.deleteMany();
