@@ -93,13 +93,3 @@ export function normalizarEncabezado(texto: string): string {
     .replace(/[^a-z0-9_]/g, "");
 }
 
-/** Compara textos sin importar mayúsculas ni tildes ("ingenieria de sistemas" = "Ingeniería de Sistemas") */
-export function claveTexto(texto: string): string {
-  return normalizarEncabezado(texto).replace(/_/g, " ");
-}
-
-/** Convierte un campo a CSV con comillas cuando hace falta */
-export function campoCSV(valor: string | number, separador: Separador = ";"): string {
-  const texto = String(valor);
-  return /["\r\n]/.test(texto) || texto.includes(separador) ? `"${texto.replace(/"/g, '""')}"` : texto;
-}

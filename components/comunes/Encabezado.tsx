@@ -49,7 +49,3 @@ export function Encabezado({
   );
 }
 
-/** Título de bloque dentro de una página (serif, más pequeño que el de la página) */
-export function TituloBloque({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <h2 className={`titulo-serif text-[28px] sm:text-[32px] ${className ?? ""}`}>{children}</h2>;
-}

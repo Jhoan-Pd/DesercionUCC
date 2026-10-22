@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { campoCSV, claveTexto, detectarSeparador, normalizarEncabezado, parsearCSV } from "@/services/carga/csv";
+import { detectarSeparador, normalizarEncabezado, parsearCSV } from "@/services/carga/csv";
 
 describe("parsearCSV", () => {
   it("detecta punto y coma (Excel en español) y coma", () => {
@@ -38,16 +38,5 @@ describe("normalización", () => {
     expect(normalizarEncabezado("Código")).toBe("codigo");
     expect(normalizarEncabezado("% Financiación")).toBe("_financiacion");
     expect(normalizarEncabezado("causa-retiro")).toBe("causa_retiro");
-  });
-
-  it("claveTexto iguala textos con y sin tildes", () => {
-    expect(claveTexto("Ingeniería de Sistemas")).toBe(claveTexto("INGENIERIA DE SISTEMAS"));
-  });
-
-  it("campoCSV agrega comillas solo cuando hace falta", () => {
-    expect(campoCSV("Pasto")).toBe("Pasto");
-    expect(campoCSV("Pérez; Gómez")).toBe('"Pérez; Gómez"');
-    expect(campoCSV('dijo "hola"')).toBe('"dijo ""hola"""');
-    expect(campoCSV(3.5)).toBe("3.5");
   });
 });

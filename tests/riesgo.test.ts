@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REGLAS, coberturaFactores, nivelPorPuntaje, puntajePorFactores } from "@/services/riesgo/factores";
+import { REGLAS, nivelPorPuntaje, puntajePorFactores } from "@/services/riesgo/factores";
 import { MINIMO_ENTRENAMIENTO, entrenarModelo, predecirConModelo, variablesUtilizables, type RegistroConResultado } from "@/services/riesgo/modelo";
 import { auc } from "@/services/riesgo/metricas";
 
@@ -25,7 +25,6 @@ describe("Puntaje por factores", () => {
     const r = puntajePorFactores({ semestre: 1 });
     expect(r.puntaje).toBe(8);
     expect(r.faltantes).toEqual(expect.arrayContaining(["promedio", "materiasPerdidas", "asistencia", "moraMatricula", "puntajeSaber11", "trabaja", "estrato", "apoyoFinanciero"]));
-    expect(coberturaFactores({ semestre: 1 })).toBeCloseTo(0.08);
   });
 
   it("estrato bajo solo suma si además no tiene apoyo financiero", () => {

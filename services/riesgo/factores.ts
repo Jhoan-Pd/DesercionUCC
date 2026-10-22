@@ -177,9 +177,3 @@ export function puntajePorFactores(d: DatosEstudiante): ResultadoRiesgo {
   return { puntaje, nivel: nivelPorPuntaje(puntaje), metodo: "FACTORES", modeloVersion: null, factores, faltantes: [...faltantes] };
 }
 
-/** Puntos máximos que se pudieron evaluar con los datos disponibles (para avisar si la evaluación es incompleta) */
-export function coberturaFactores(d: DatosEstudiante): number {
-  const total = REGLAS.reduce((s, r) => s + r.maximo, 0);
-  const evaluable = REGLAS.filter((r) => r.variables.every((v) => tieneValor(d[v]))).reduce((s, r) => s + r.maximo, 0);
-  return evaluable / total;
-}
