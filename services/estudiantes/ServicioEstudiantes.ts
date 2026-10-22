@@ -33,6 +33,8 @@ export interface FilaEstudiante {
 }
 
 const MAX_FACTORES_FRECUENTES = 6;
+/** Estudiantes por consulta al recorrer la lista en flujo (gRPC) */
+const LOTE_RECORRIDO = 50;
 
 /** Consultas de estudiantes y del resumen de riesgo (solo estudiantes ACTIVOS cargados por el administrador) */
 export class ServicioEstudiantes {
@@ -119,6 +121,38 @@ export class ServicioEstudiantes {
           }
         : null,
     };
+  }
+
+  /**
+   * Recorre los estudiantes activos de los niveles pedidos, del mayor al menor riesgo, en lotes con
+   * paginación por cursor (puntaje, id). Es un generador asíncrono: quien lo consume (el flujo gRPC)
+   * envía cada estudiante apenas se lee, sin cargar la lista completa en memoria.
+   */
+  async *recorrerEnRiesgo(niveles: NivelRiesgo[], limite: number, senal?: AbortSignal): AsyncGenerator<Omit<FilaEstudiante, "nombre">> {
+    let cursor: string | undefined;
+    let enviados = 0;
+    while (enviados < limite && !senal?.aborted) {
+      const lote = await prisma.evaluacion.findMany({
+        where: { nivel: { in: niveles }, estudiante: { estado: "ACTIVO" } },
+        orderBy: [{ puntaje: "desc" }, { id: "asc" }],
+        take: Math.min(LOTE_RECORRIDO, limite - enviados),
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        include: { estudiante: { select: { codigo: true, programa: true, semestre: true } } },
+      });
+      if (lote.length === 0) return;
+      for (const ev of lote) {
+        yield {
+          codigo: ev.estudiante.codigo,
+          programa: ev.estudiante.programa,
+          semestre: ev.estudiante.semestre,
+          puntaje: ev.puntaje,
+          nivel: ev.nivel,
+          factores: factoresDe(ev.factores).slice(0, 3).map((f) => f.etiqueta),
+        };
+      }
+      enviados += lote.length;
+      cursor = lote[lote.length - 1].id;
+    }
   }
 
   /** Resumen para la página de inicio */
