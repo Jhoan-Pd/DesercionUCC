@@ -43,35 +43,49 @@ export interface ResultadoLectura {
   ignoradas: string[];
 }
 
+/** Rango válido de una columna numérica y cómo explicarlo en el mensaje de error */
+interface Rango {
+  min: number;
+  max: number;
+  entero?: boolean;
+  texto: string;
+}
+
 interface DefColumna {
   campo: keyof EstudianteArchivo;
+  /** Nombres aceptados en el encabezado (ya normalizados). El primero es el de la plantilla. */
   alias: string[];
   obligatoria?: boolean;
   descripcion: string;
   ejemplo: string;
+  rango?: Rango;
 }
 
-/** Columnas de la plantilla, en orden. El primer alias es el nombre que va en la plantilla. */
+/** Columnas de la plantilla, en orden. Toda la información de una columna (alias, rango, ayuda) vive en su fila. */
 export const COLUMNAS: DefColumna[] = [
   { campo: "codigo", alias: ["codigo", "codigo_estudiante", "codigo_estudiantil", "cod"], obligatoria: true, descripcion: "Código estudiantil (único por estudiante)", ejemplo: "" },
   { campo: "nombre", alias: ["nombre", "nombres", "nombre_completo", "estudiante"], obligatoria: true, descripcion: "Nombre completo", ejemplo: "" },
   { campo: "programa", alias: ["programa", "programa_academico", "carrera"], obligatoria: true, descripcion: "Programa académico", ejemplo: "Derecho" },
-  { campo: "semestre", alias: ["semestre", "semestre_actual"], obligatoria: true, descripcion: "Semestre que cursa (1 a 14)", ejemplo: "3" },
-  { campo: "promedio", alias: ["promedio", "promedio_acumulado", "promedio_ponderado"], descripcion: "Promedio acumulado de 0 a 5", ejemplo: "3,4" },
-  { campo: "materiasPerdidas", alias: ["materias_perdidas", "asignaturas_perdidas", "materias_reprobadas"], descripcion: "Materias perdidas en el último periodo", ejemplo: "1" },
-  { campo: "asistencia", alias: ["asistencia", "porcentaje_asistencia"], descripcion: "Porcentaje de asistencia (0 a 100)", ejemplo: "85" },
-  { campo: "estrato", alias: ["estrato", "estrato_socioeconomico"], descripcion: "Estrato socioeconómico (1 a 6)", ejemplo: "2" },
+  { campo: "semestre", alias: ["semestre", "semestre_actual"], obligatoria: true, descripcion: "Semestre que cursa (1 a 14)", ejemplo: "3", rango: { min: 1, max: 14, entero: true, texto: "un número entero de 1 a 14" } },
+  { campo: "promedio", alias: ["promedio", "promedio_acumulado", "promedio_ponderado"], descripcion: "Promedio acumulado de 0 a 5", ejemplo: "3,4", rango: { min: 0, max: 5, texto: "un número de 0 a 5" } },
+  { campo: "materiasPerdidas", alias: ["materias_perdidas", "asignaturas_perdidas", "materias_reprobadas"], descripcion: "Materias perdidas en el último periodo", ejemplo: "1", rango: { min: 0, max: 20, entero: true, texto: "un número entero de 0 a 20" } },
+  { campo: "asistencia", alias: ["asistencia", "porcentaje_asistencia"], descripcion: "Porcentaje de asistencia (0 a 100)", ejemplo: "85", rango: { min: 0, max: 100, texto: "un porcentaje de 0 a 100" } },
+  { campo: "estrato", alias: ["estrato", "estrato_socioeconomico"], descripcion: "Estrato socioeconómico (1 a 6)", ejemplo: "2", rango: { min: 1, max: 6, entero: true, texto: "un número entero de 1 a 6" } },
   { campo: "trabaja", alias: ["trabaja", "trabaja_actualmente"], descripcion: "¿Trabaja? (sí / no)", ejemplo: "no" },
   { campo: "apoyoFinanciero", alias: ["apoyo_financiero", "beca_credito", "beca", "credito"], descripcion: "¿Tiene beca, crédito o subsidio? (sí / no)", ejemplo: "sí" },
   { campo: "moraMatricula", alias: ["mora_matricula", "pagos_pendientes", "deuda_matricula"], descripcion: "¿Tiene pagos de matrícula pendientes? (sí / no)", ejemplo: "no" },
-  { campo: "puntajeSaber11", alias: ["puntaje_saber11", "saber11", "saber_11", "puntaje_icfes", "icfes"], descripcion: "Puntaje global Saber 11 (0 a 500)", ejemplo: "290" },
-  { campo: "edad", alias: ["edad"], descripcion: "Edad en años", ejemplo: "20" },
+  { campo: "puntajeSaber11", alias: ["puntaje_saber11", "saber11", "saber_11", "puntaje_icfes", "icfes"], descripcion: "Puntaje global Saber 11 (0 a 500)", ejemplo: "290", rango: { min: 0, max: 500, entero: true, texto: "un número entero de 0 a 500" } },
+  { campo: "edad", alias: ["edad"], descripcion: "Edad en años", ejemplo: "20", rango: { min: 14, max: 90, entero: true, texto: "un número entero de 14 a 90" } },
   { campo: "estado", alias: ["estado", "situacion"], descripcion: "activo, retirado o graduado (vacío = activo). Los retirados y graduados sirven para entrenar el modelo", ejemplo: "activo" },
   { campo: "periodo", alias: ["periodo", "periodo_academico"], descripcion: "Periodo de los datos", ejemplo: "2026-2" },
 ];
 
-const POR_ALIAS = new Map<string, DefColumna>();
-for (const c of COLUMNAS) for (const a of c.alias) POR_ALIAS.set(a, c);
+/** Índices para buscar una columna en O(1): por cualquiera de sus alias y por su campo */
+const POR_ALIAS = new Map<string, DefColumna>(COLUMNAS.flatMap((c) => c.alias.map((a) => [a, c] as const)));
+const POR_CAMPO = new Map<keyof EstudianteArchivo, DefColumna>(COLUMNAS.map((c) => [c.campo, c]));
+
+/** Nombre de la columna en la plantilla (el que se muestra en los mensajes de error) */
+const nombreColumna = (campo: keyof EstudianteArchivo) => POR_CAMPO.get(campo)?.alias[0] ?? campo;
 
 /** "3,5" -> 3.5 ; "85 %" -> 85 ; "" -> null ; texto -> NaN */
 export function leerNumero(valor: string): number | null {
@@ -94,132 +108,126 @@ export function leerBooleano(valor: string): boolean | null | undefined {
   return undefined;
 }
 
+/** Palabras con las que los sistemas académicos suelen escribir cada estado (vacío = activo) */
+const SINONIMOS_ESTADO = new Map<string, EstadoArchivo>([
+  ["", "ACTIVO"],
+  ["activo", "ACTIVO"],
+  ["matriculado", "ACTIVO"],
+  ["retirado", "RETIRADO"],
+  ["desertor", "RETIRADO"],
+  ["deserto", "RETIRADO"],
+  ["retiro", "RETIRADO"],
+  ["cancelado", "RETIRADO"],
+  ["graduado", "GRADUADO"],
+  ["egresado", "GRADUADO"],
+]);
+
 export function leerEstado(valor: string): EstadoArchivo | undefined {
-  const t = normalizarValor(valor);
-  if (t === "" || t === "activo" || t === "matriculado") return "ACTIVO";
-  if (["retirado", "desertor", "deserto", "retiro", "cancelado"].includes(t)) return "RETIRADO";
-  if (["graduado", "egresado"].includes(t)) return "GRADUADO";
-  return undefined;
+  return SINONIMOS_ESTADO.get(normalizarValor(valor));
 }
 
-const RANGOS: Partial<Record<keyof EstudianteArchivo, { min: number; max: number; entero?: boolean; texto: string }>> = {
-  semestre: { min: 1, max: 14, entero: true, texto: "un número entero de 1 a 14" },
-  promedio: { min: 0, max: 5, texto: "un número de 0 a 5" },
-  materiasPerdidas: { min: 0, max: 20, entero: true, texto: "un número entero de 0 a 20" },
-  asistencia: { min: 0, max: 100, texto: "un porcentaje de 0 a 100" },
-  estrato: { min: 1, max: 6, entero: true, texto: "un número entero de 1 a 6" },
-  puntajeSaber11: { min: 0, max: 500, entero: true, texto: "un número entero de 0 a 500" },
-  edad: { min: 14, max: 90, entero: true, texto: "un número entero de 14 a 90" },
-};
-
-const ETIQUETA: Record<keyof EstudianteArchivo, string> = {
-  codigo: "codigo",
-  nombre: "nombre",
-  programa: "programa",
-  semestre: "semestre",
-  promedio: "promedio",
-  materiasPerdidas: "materias_perdidas",
-  asistencia: "asistencia",
-  estrato: "estrato",
-  trabaja: "trabaja",
-  apoyoFinanciero: "apoyo_financiero",
-  moraMatricula: "mora_matricula",
-  puntajeSaber11: "puntaje_saber11",
-  edad: "edad",
-  estado: "estado",
-  periodo: "periodo",
-};
-
 export const MAX_FILAS = 20000;
+const MAX_LARGO_CODIGO = 40;
 
-export function validarTabla(tabla: TablaCSV): ResultadoLectura {
-  const indice = new Map<keyof EstudianteArchivo, number>();
+type IndiceColumnas = Map<keyof EstudianteArchivo, number>;
+
+/** Ubica cada columna conocida en el encabezado del archivo; las desconocidas se devuelven aparte */
+function indexarColumnas(encabezados: string[]): { indice: IndiceColumnas; ignoradas: string[] } {
+  const indice: IndiceColumnas = new Map();
   const ignoradas: string[] = [];
-  tabla.encabezados.forEach((e, i) => {
+  encabezados.forEach((e, i) => {
     const def = POR_ALIAS.get(normalizarEncabezado(e));
     if (def && !indice.has(def.campo)) indice.set(def.campo, i);
     else if (e.trim() !== "") ignoradas.push(e);
   });
+  return { indice, ignoradas };
+}
+
+/** Lee y valida una fila. Devuelve el estudiante y los problemas encontrados (si hay alguno, la fila se rechaza). */
+function leerFila(valores: string[], indice: IndiceColumnas): { estudiante: EstudianteArchivo; problemas: string[] } {
+  const problemas: string[] = [];
+  const celda = (c: keyof EstudianteArchivo) => {
+    const i = indice.get(c);
+    return i === undefined ? "" : (valores[i] ?? "").trim();
+  };
+  const numero = (c: keyof EstudianteArchivo): number | null => {
+    const v = leerNumero(celda(c));
+    const r = POR_CAMPO.get(c)?.rango;
+    if (v === null || !r) return v;
+    if (Number.isNaN(v) || v < r.min || v > r.max || (r.entero && !Number.isInteger(v))) {
+      problemas.push(`${nombreColumna(c)} debe ser ${r.texto} (llegó "${celda(c)}")`);
+      return null;
+    }
+    return v;
+  };
+  const booleano = (c: keyof EstudianteArchivo): boolean | null => {
+    const v = leerBooleano(celda(c));
+    if (v === undefined) {
+      problemas.push(`${nombreColumna(c)} debe ser sí o no (llegó "${celda(c)}")`);
+      return null;
+    }
+    return v;
+  };
+
+  const codigo = celda("codigo");
+  const nombre = celda("nombre").replace(/\s+/g, " ");
+  const programa = celda("programa");
+  if (!codigo) problemas.push("falta el código");
+  if (!nombre) problemas.push("falta el nombre");
+  if (!programa) problemas.push("falta el programa");
+  if (codigo.length > MAX_LARGO_CODIGO) problemas.push("el código es demasiado largo");
+
+  const semestre = numero("semestre");
+  if (celda("semestre") === "") problemas.push("falta el semestre");
+  const estado = leerEstado(celda("estado"));
+  if (!estado) problemas.push(`estado debe ser activo, retirado o graduado (llegó "${celda("estado")}")`);
+
+  const estudiante: EstudianteArchivo = {
+    codigo,
+    nombre,
+    programa: formatoTitulo(programa),
+    semestre: semestre ?? 0,
+    promedio: numero("promedio"),
+    materiasPerdidas: numero("materiasPerdidas"),
+    asistencia: numero("asistencia"),
+    estrato: numero("estrato"),
+    trabaja: booleano("trabaja"),
+    apoyoFinanciero: booleano("apoyoFinanciero"),
+    moraMatricula: booleano("moraMatricula"),
+    puntajeSaber11: numero("puntajeSaber11"),
+    edad: numero("edad"),
+    estado: estado ?? "ACTIVO",
+    periodo: celda("periodo") || null,
+  };
+  return { estudiante, problemas };
+}
+
+export function validarTabla(tabla: TablaCSV): ResultadoLectura {
+  const { indice, ignoradas } = indexarColumnas(tabla.encabezados);
+  const columnas = [...indice.keys()];
+  const rechazo = (mensaje: string): ResultadoLectura => ({ estudiantes: [], errores: [{ fila: 1, mensaje }], columnas, ignoradas });
 
   const faltan = COLUMNAS.filter((c) => c.obligatoria && !indice.has(c.campo)).map((c) => c.alias[0]);
-  if (faltan.length > 0) {
-    return { estudiantes: [], errores: [{ fila: 1, mensaje: `Faltan columnas obligatorias: ${faltan.join(", ")}. Descarga la plantilla para ver el formato.` }], columnas: [...indice.keys()], ignoradas };
-  }
-  if (tabla.filas.length > MAX_FILAS) {
-    return { estudiantes: [], errores: [{ fila: 1, mensaje: `El archivo tiene ${tabla.filas.length} filas; el máximo por carga es ${MAX_FILAS}.` }], columnas: [...indice.keys()], ignoradas };
-  }
+  if (faltan.length > 0) return rechazo(`Faltan columnas obligatorias: ${faltan.join(", ")}. Descarga la plantilla para ver el formato.`);
+  if (tabla.filas.length > MAX_FILAS) return rechazo(`El archivo tiene ${tabla.filas.length} filas; el máximo por carga es ${MAX_FILAS}.`);
 
   const estudiantes: EstudianteArchivo[] = [];
   const errores: ErrorFila[] = [];
+  /** Código -> fila donde apareció por primera vez (para detectar repetidos en O(1)) */
   const vistos = new Map<string, number>();
 
   for (const { linea, valores } of tabla.filas) {
-    const celda = (c: keyof EstudianteArchivo) => {
-      const i = indice.get(c);
-      return i === undefined ? "" : (valores[i] ?? "").trim();
-    };
-    const problemas: string[] = [];
-
-    const codigo = celda("codigo");
-    const nombre = celda("nombre").replace(/\s+/g, " ");
-    const programa = celda("programa");
-    if (!codigo) problemas.push("falta el código");
-    if (!nombre) problemas.push("falta el nombre");
-    if (!programa) problemas.push("falta el programa");
-    if (codigo.length > 40) problemas.push("el código es demasiado largo");
-
-    const numero = (c: keyof EstudianteArchivo): number | null => {
-      const v = leerNumero(celda(c));
-      const r = RANGOS[c];
-      if (v === null || !r) return v;
-      if (Number.isNaN(v) || v < r.min || v > r.max || (r.entero && !Number.isInteger(v))) {
-        problemas.push(`${ETIQUETA[c]} debe ser ${r.texto} (llegó "${celda(c)}")`);
-        return null;
-      }
-      return v;
-    };
-    const booleano = (c: keyof EstudianteArchivo): boolean | null => {
-      const v = leerBooleano(celda(c));
-      if (v === undefined) {
-        problemas.push(`${ETIQUETA[c]} debe ser sí o no (llegó "${celda(c)}")`);
-        return null;
-      }
-      return v;
-    };
-
-    const semestre = numero("semestre");
-    if (semestre === null && !problemas.some((p) => p.startsWith("semestre"))) problemas.push("falta el semestre");
-    const estado = leerEstado(celda("estado"));
-    if (!estado) problemas.push(`estado debe ser activo, retirado o graduado (llegó "${celda("estado")}")`);
-
-    const e: EstudianteArchivo = {
-      codigo,
-      nombre,
-      programa: formatoTitulo(programa),
-      semestre: semestre ?? 0,
-      promedio: numero("promedio"),
-      materiasPerdidas: numero("materiasPerdidas"),
-      asistencia: numero("asistencia"),
-      estrato: numero("estrato"),
-      trabaja: booleano("trabaja"),
-      apoyoFinanciero: booleano("apoyoFinanciero"),
-      moraMatricula: booleano("moraMatricula"),
-      puntajeSaber11: numero("puntajeSaber11"),
-      edad: numero("edad"),
-      estado: estado ?? "ACTIVO",
-      periodo: celda("periodo") || null,
-    };
-
-    if (codigo && vistos.has(codigo)) problemas.push(`el código ${codigo} ya aparece en la fila ${vistos.get(codigo)}`);
-
+    const { estudiante, problemas } = leerFila(valores, indice);
+    const previa = vistos.get(estudiante.codigo);
+    if (estudiante.codigo && previa !== undefined) problemas.push(`el código ${estudiante.codigo} ya aparece en la fila ${previa}`);
     if (problemas.length > 0) {
       errores.push({ fila: linea, mensaje: problemas.join("; ") });
       continue;
     }
-    vistos.set(codigo, linea);
-    estudiantes.push(e);
+    vistos.set(estudiante.codigo, linea);
+    estudiantes.push(estudiante);
   }
-  return { estudiantes, errores, columnas: [...indice.keys()], ignoradas };
+  return { estudiantes, errores, columnas, ignoradas };
 }
 
 export function leerCSV(texto: string): ResultadoLectura {

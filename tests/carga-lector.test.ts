@@ -57,6 +57,11 @@ describe("Validación del archivo", () => {
     expect(r.errores[2].mensaje).toMatch(/estrato.*trabaja/);
   });
 
+  it("distingue el semestre vacío del semestre inválido", () => {
+    const r = leerCSV("codigo,nombre,programa,semestre\nA1,Ana,Derecho,\nA2,Bea,Derecho,quince");
+    expect(r.errores.map((e) => e.mensaje)).toEqual(["falta el semestre", 'semestre debe ser un número entero de 1 a 14 (llegó "quince")']);
+  });
+
   it("detecta códigos repetidos dentro del mismo archivo", () => {
     const r = leerCSV("codigo,nombre,programa,semestre\nA1,Ana,Derecho,1\nA1,Otra,Derecho,2");
     expect(r.estudiantes).toHaveLength(1);
