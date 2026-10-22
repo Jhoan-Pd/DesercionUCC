@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectarSeparador, normalizarEncabezado, parsearCSV } from "@/services/carga/csv";
+import { ErrorCSV, detectarSeparador, normalizarEncabezado, parsearCSV } from "@/services/carga/csv";
 
 describe("parsearCSV", () => {
   it("detecta punto y coma (Excel en español) y coma", () => {
@@ -25,6 +25,21 @@ describe("parsearCSV", () => {
     const t = parsearCSV('a,b\n1,"línea\npartida"\n2,x\n');
     expect(t.filas.map((f) => f.linea)).toEqual([2, 4]);
     expect(t.filas[0].valores[1]).toBe("línea\npartida");
+  });
+
+  it("una comilla en medio de un campo es un carácter más y no se traga las filas siguientes", () => {
+    const t = parsearCSV('codigo;nombre;periodo\n1;Ana;2026-2"\n2;Luis;2026-2\n3;Eva;2026-2\n');
+    expect(t.filas.map((f) => f.valores[0])).toEqual(["1", "2", "3"]);
+    expect(t.filas[0].valores[2]).toBe('2026-2"');
+  });
+
+  it("una comilla de apertura que nunca se cierra rechaza el archivo indicando la línea", () => {
+    expect(() => parsearCSV('codigo;nombre\n1;Ana\n2;"Luis\n3;Eva\n')).toThrow(ErrorCSV);
+    try {
+      parsearCSV('codigo;nombre\n1;Ana\n2;"Luis\n3;Eva\n');
+    } catch (e) {
+      expect((e as ErrorCSV).linea).toBe(3);
+    }
   });
 
   it("archivo vacío", () => {

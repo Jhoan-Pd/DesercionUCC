@@ -29,6 +29,21 @@ export function detectarSeparador(primeraLinea: string): Separador {
   return mejor[1] > 0 ? mejor[0] : ",";
 }
 
+/** El archivo no se puede leer como CSV (p. ej. una comilla que nunca se cierra) */
+export class ErrorCSV extends Error {
+  constructor(
+    mensaje: string,
+    public readonly linea: number,
+  ) {
+    super(mensaje);
+    this.name = "ErrorCSV";
+  }
+}
+
+/**
+ * @throws ErrorCSV si una comilla abierta no se cierra: el resto del archivo quedaría dentro de un solo
+ *   campo y los estudiantes siguientes desaparecerían sin aviso.
+ */
 export function parsearCSV(texto: string): TablaCSV {
   const contenido = texto.replace(/^﻿/, "");
   const primeraLinea = contenido.split(/\r?\n/, 1)[0] ?? "";
@@ -40,6 +55,7 @@ export function parsearCSV(texto: string): TablaCSV {
   let enComillas = false;
   let linea = 1;
   let lineaInicio = 1;
+  let lineaComilla = 1;
 
   const cerrarFila = () => {
     fila.push(campo);
@@ -63,8 +79,12 @@ export function parsearCSV(texto: string): TablaCSV {
       }
       continue;
     }
-    if (ch === '"') enComillas = true;
-    else if (ch === separador) {
+    // Solo una comilla al INICIO del campo abre un texto entre comillas (RFC 4180). En medio de un
+    // campo es un carácter más: «Pasto "centro"» o «12"» no deben tragarse las filas siguientes.
+    if (ch === '"' && campo === "") {
+      enComillas = true;
+      lineaComilla = linea;
+    } else if (ch === separador) {
       fila.push(campo);
       campo = "";
     } else if (ch === "\n" || ch === "\r") {
@@ -74,6 +94,7 @@ export function parsearCSV(texto: string): TablaCSV {
       lineaInicio = linea;
     } else campo += ch;
   }
+  if (enComillas) throw new ErrorCSV(`La comilla (") que abre un texto en la línea ${lineaComilla} nunca se cierra. Revisa esa línea del archivo.`, lineaComilla);
   if (campo !== "" || fila.length > 0) cerrarFila();
 
   const [encabezado, ...datos] = registros;

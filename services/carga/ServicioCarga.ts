@@ -6,7 +6,7 @@ import { bloquear } from "@/lib/bloqueos";
 import { ServicioEvaluacion, type ClienteBD } from "@/services/riesgo/ServicioEvaluacion";
 import { leerExcel } from "./excel";
 import { validarTabla, type ErrorFila, type EstudianteArchivo, type ResultadoLectura } from "./lector";
-import { parsearCSV } from "./csv";
+import { ErrorCSV, parsearCSV } from "./csv";
 import { TAMANO_MAXIMO, TAMANO_MAXIMO_MB } from "./limites";
 
 /** Filas por INSERT: con 19 columnas son unos 9.500 parámetros, lejos del límite de PostgreSQL (65.535) */
@@ -45,7 +45,14 @@ export async function leerArchivo(nombre: string, buffer: ArrayBuffer): Promise<
       throw new ErrorApi(400, "No se pudo leer el archivo de Excel. Guárdalo como .xlsx o como CSV e inténtalo de nuevo.");
     }
   }
-  if (ext === "csv" || ext === "txt") return validarTabla(parsearCSV(decodificarTexto(buffer)));
+  if (ext === "csv" || ext === "txt") {
+    try {
+      return validarTabla(parsearCSV(decodificarTexto(buffer)));
+    } catch (e) {
+      if (e instanceof ErrorCSV) throw new ErrorApi(400, e.message);
+      throw e;
+    }
+  }
   throw new ErrorApi(400, "Formato no admitido. Sube un archivo .xlsx o .csv (puedes partir de la plantilla).");
 }
 
