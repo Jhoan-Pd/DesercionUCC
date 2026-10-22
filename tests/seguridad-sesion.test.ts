@@ -6,21 +6,29 @@ import { config } from "@/middleware";
 
 describe("revalidarSesion", () => {
   it("una cuenta activa conserva la sesión con su rol ACTUAL de la base de datos", () => {
-    expect(revalidarSesion({ activo: true, rol: "BIENESTAR" })).toEqual({ valida: true, rol: "BIENESTAR" });
+    expect(revalidarSesion({ activo: true, rol: "BIENESTAR", huella: "h1" }, "h1")).toEqual({ valida: true, rol: "BIENESTAR" });
   });
 
   it("aplica un cambio de rol sin cerrar sesión", () => {
-    const r = revalidarSesion({ activo: true, rol: "ADMIN" });
+    const r = revalidarSesion({ activo: true, rol: "ADMIN", huella: "h1" }, "h1");
     expect(r.valida && r.rol).toBe("ADMIN");
   });
 
   it("una cuenta desactivada o eliminada pierde la sesión de inmediato", () => {
-    expect(revalidarSesion({ activo: false, rol: "ADMIN" })).toEqual({ valida: false, motivo: "inactiva" });
+    expect(revalidarSesion({ activo: false, rol: "ADMIN", huella: "h1" }, "h1")).toEqual({ valida: false, motivo: "inactiva" });
     expect(revalidarSesion(null)).toEqual({ valida: false, motivo: "inexistente" });
   });
 
+  it("restablecer la contraseña cierra las sesiones abiertas con la anterior", () => {
+    expect(revalidarSesion({ activo: true, rol: "ADMIN", huella: "nueva" }, "vieja")).toEqual({ valida: false, motivo: "contrasena-cambiada" });
+  });
+
+  it("las sesiones iniciadas antes de existir la huella siguen válidas hasta que expiren", () => {
+    expect(revalidarSesion({ activo: true, rol: "BIENESTAR", huella: "h1" })).toEqual({ valida: true, rol: "BIENESTAR" });
+  });
+
   it("los roles eliminados (DOCENTE, ESTUDIANTE) ya no son válidos", () => {
-    expect(revalidarSesion({ activo: true, rol: "DOCENTE" })).toEqual({ valida: false, motivo: "rol-invalido" });
+    expect(revalidarSesion({ activo: true, rol: "DOCENTE", huella: "h1" }, "h1")).toEqual({ valida: false, motivo: "rol-invalido" });
     expect(esRol("ESTUDIANTE")).toBe(false);
   });
 });

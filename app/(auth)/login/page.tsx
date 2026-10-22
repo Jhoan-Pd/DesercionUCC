@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LoginPage({ searchParams }: { searchParams: { callbackUrl?: string; motivo?: string } }) {
   const session = await getServerSession(authOptions);
-  // Una sesión revocada (cuenta desactivada) no redirige: se muestra el aviso y se puede entrar con otra cuenta
+  // Una sesión revocada (cuenta desactivada o contraseña cambiada) no redirige: se muestra el aviso y se puede entrar con otra cuenta
   if (session && !session.revocada) redirect(RUTA_INICIAL);
 
   return (
@@ -47,9 +47,9 @@ export default async function LoginPage({ searchParams }: { searchParams: { call
               <h2 className="titulo-serif text-[34px]">iniciar sesión.</h2>
               <p className="text-sm text-grafito">Ingresa con tu correo institucional.</p>
             </div>
-            {(searchParams.motivo === "cuenta-desactivada" || session?.revocada) && (
+            {(searchParams.motivo === "sesion-revocada" || session?.revocada) && (
               <Alert variant="warning" titulo="Tu sesión se cerró">
-                La cuenta fue desactivada por el administrador. Si crees que es un error, comunícate con el administrador del observatorio.
+                El administrador desactivó la cuenta o cambió su contraseña. Inicia sesión de nuevo; si no puedes entrar, comunícate con el administrador del observatorio.
               </Alert>
             )}
             <FormularioLogin callbackUrl={searchParams.callbackUrl} />
