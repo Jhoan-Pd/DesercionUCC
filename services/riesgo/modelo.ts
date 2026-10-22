@@ -2,7 +2,7 @@ import { z } from "zod";
 import { EntrenadorLogistico } from "./EntrenadorLogistico";
 import { calcularMetricas, esDePrueba } from "./metricas";
 import type { FactorRiesgo, NivelRiesgo, ResultadoRiesgo } from "./factores";
-import { CLAVES_VARIABLES, VARIABLES, tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
+import { CLAVES_VARIABLES, VARIABLE, VARIABLES, tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
 
 /**
  * MODELO ESTADÍSTICO entrenado con estudiantes REALES de la UCC que ya tienen resultado conocido
@@ -197,7 +197,7 @@ export function predecirConModelo(def: DefinicionModelo, d: DatosEstudiante): Re
       const puntos = Math.round(100 * (exceso > 0 ? (exceso * positivos[i]) / sumaPositivos : p - sigmoide(logit - aportes[i])));
       if (puntos < 1) return null;
       const valor = d[clave] as number | boolean;
-      const def_ = VARIABLES.find((v) => v.clave === clave)!;
+      const def_ = VARIABLE[clave];
       const detalle =
         typeof valor === "boolean"
           ? `${def_.formato(valor)}; en la UCC lo tiene el ${Math.round(def.medias[i] * 100)} % de los estudiantes con resultado conocido.`
