@@ -1,0 +1,10 @@
+# `npm run grpc:generar` — genera los tipos y el descriptor del servicio en TypeScript (Protobuf-ES v2)
+version: v2
+inputs:
+  - directory: proto
+plugins:
+  - local: protoc-gen-es
+    out: lib/grpc/gen
+    opt:
+      - target=ts
+      - import_extension=none
