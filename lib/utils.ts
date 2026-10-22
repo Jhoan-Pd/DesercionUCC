@@ -22,3 +22,16 @@ export function memorizar<A, R>(fn: (a: A) => R): (a: A) => R {
     return cache.get(a) as R;
   };
 }
+
+/**
+ * Decodifica un segmento de la URL (p. ej. el código de un estudiante). Si el texto no es una
+ * secuencia válida (un "%" suelto), decodeURIComponent lanza URIError y la ruta respondía 500;
+ * aquí se devuelve el texto tal cual y la validación posterior decide.
+ */
+export function decodificarSegmento(segmento: string): string {
+  try {
+    return decodeURIComponent(segmento);
+  } catch {
+    return segmento;
+  }
+}

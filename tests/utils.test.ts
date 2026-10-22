@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { memorizar, sinVacios } from "@/lib/utils";
+import { decodificarSegmento, memorizar, sinVacios } from "@/lib/utils";
 
 describe("utilidades", () => {
   it("memorizar llama a la función una sola vez por valor", () => {
@@ -12,5 +12,10 @@ describe("utilidades", () => {
   it("sinVacios quita los parámetros vacíos o ausentes", () => {
     expect(sinVacios([["q", "ana"], ["programa", ""], ["nivel", undefined]])).toEqual({ q: "ana" });
     expect(sinVacios(new URLSearchParams("q=&nivel=ALTO"))).toEqual({ nivel: "ALTO" });
+  });
+
+  it("decodificarSegmento no lanza con un % suelto", () => {
+    expect(decodificarSegmento("A%20001")).toBe("A 001");
+    expect(decodificarSegmento("50%")).toBe("50%");
   });
 });

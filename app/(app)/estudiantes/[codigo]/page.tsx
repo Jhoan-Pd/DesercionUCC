@@ -4,6 +4,7 @@ import { ArrowLeft, Bot } from "lucide-react";
 import { ServicioEstudiantes } from "@/services/estudiantes/ServicioEstudiantes";
 import { VARIABLES, tieneValor } from "@/services/riesgo/variables";
 import { formatoFecha } from "@/lib/formato";
+import { decodificarSegmento } from "@/lib/utils";
 import { Encabezado } from "@/components/comunes/Encabezado";
 import { NivelBadge } from "@/components/estudiantes/NivelBadge";
 import { BarraPuntaje } from "@/components/estudiantes/BarraPuntaje";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 const ESTADO: Record<string, string> = { ACTIVO: "Activo", RETIRADO: "Retirado", GRADUADO: "Graduado" };
 
 export default async function FichaPage({ params }: { params: { codigo: string } }) {
-  const e = await new ServicioEstudiantes().detalle(decodeURIComponent(params.codigo));
+  const e = await new ServicioEstudiantes().detalle(decodificarSegmento(params.codigo));
   if (!e) notFound();
   const ev = e.evaluacion;
 
