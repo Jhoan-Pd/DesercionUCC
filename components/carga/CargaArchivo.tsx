@@ -3,21 +3,12 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileSpreadsheet, Upload } from "lucide-react";
+import { enviarFormulario } from "@/lib/cliente-api";
 import { formatoEntero, formatoNumero } from "@/lib/formato";
+import type { ResumenCarga } from "@/services/carga/ServicioCarga";
+import { TAMANO_MAXIMO, TAMANO_MAXIMO_MB } from "@/services/carga/limites";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
-
-interface Resumen {
-  archivo: string;
-  filas: number;
-  nuevos: number;
-  actualizados: number;
-  errores: { fila: number; mensaje: string }[];
-  totalErrores: number;
-  ignoradas: string[];
-  modelo: { estado: "INSUFICIENTE" | "ACTIVADO" | "NO_ACTIVADO"; motivo: string };
-  evaluados: number;
-}
 
 
 /** Subida del archivo de estudiantes (.xlsx o .csv) y resumen del resultado */
@@ -27,21 +18,22 @@ export function CargaArchivo() {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resumen, setResumen] = useState<Resumen | null>(null);
+  const [resumen, setResumen] = useState<ResumenCarga | null>(null);
   const [arrastrando, setArrastrando] = useState(false);
 
   async function subir() {
     if (!archivo) return;
+    if (archivo.size > TAMANO_MAXIMO) {
+      setError(`El archivo pesa más de ${TAMANO_MAXIMO_MB} MB. Divídelo en varios archivos o quita las columnas que no se usan.`);
+      return;
+    }
     setCargando(true);
     setError(null);
     setResumen(null);
     try {
       const datos = new FormData();
       datos.append("archivo", archivo);
-      const res = await fetch("/api/cargas", { method: "POST", body: datos });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error ?? "No se pudo cargar el archivo.");
-      setResumen(json as Resumen);
+      setResumen(await enviarFormulario<ResumenCarga>("/api/cargas", datos));
       setArchivo(null);
       if (entrada.current) entrada.current.value = "";
       router.refresh();
@@ -70,7 +62,7 @@ export function CargaArchivo() {
       >
         <FileSpreadsheet className="h-9 w-9 text-petroleo" aria-hidden />
         <span className="font-medium">{archivo ? archivo.name : "Arrastra aquí el archivo o haz clic para elegirlo"}</span>
-        <span className="meta">{archivo ? `${formatoEntero(archivo.size / 1024)} KB` : "Excel (.xlsx) o CSV · máximo 5 MB"}</span>
+        <span className="meta">{archivo ? `${formatoEntero(archivo.size / 1024)} KB` : `Excel (.xlsx) o CSV · máximo ${TAMANO_MAXIMO_MB} MB`}</span>
         <input ref={entrada} type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="sr-only" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} />
       </label>
 

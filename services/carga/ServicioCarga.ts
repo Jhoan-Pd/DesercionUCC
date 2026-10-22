@@ -6,10 +6,13 @@ import { ServicioEvaluacion } from "@/services/riesgo/ServicioEvaluacion";
 import { leerExcel } from "./excel";
 import { validarTabla, type ErrorFila, type EstudianteArchivo, type ResultadoLectura } from "./lector";
 import { parsearCSV } from "./csv";
+import { TAMANO_MAXIMO, TAMANO_MAXIMO_MB } from "./limites";
 
-export const TAMANO_MAXIMO = 5 * 1024 * 1024; // 5 MB
+/** Filas por INSERT: con 19 columnas son unos 9.500 parámetros, lejos del límite de PostgreSQL (65.535) */
 const LOTE = 500;
+/** Errores que se guardan y se devuelven (el total se informa aparte) */
 const MAX_ERRORES_GUARDADOS = 200;
+const MAX_LARGO_NOMBRE_ARCHIVO = 200;
 
 export interface ResumenCarga {
   archivo: string;
@@ -70,43 +73,26 @@ export class ServicioCarga {
 
   async procesar(nombre: string, buffer: ArrayBuffer, usuarioId: string): Promise<ResumenCarga> {
     if (buffer.byteLength === 0) throw new ErrorApi(400, "El archivo está vacío.");
-    if (buffer.byteLength > TAMANO_MAXIMO) throw new ErrorApi(413, "El archivo supera los 5 MB.");
+    if (buffer.byteLength > TAMANO_MAXIMO) throw new ErrorApi(413, `El archivo supera los ${TAMANO_MAXIMO_MB} MB.`);
     const lectura = await leerArchivo(nombre, buffer);
+    // Filas de datos leídas: las válidas más las rechazadas (el error de la fila 1 es del encabezado)
     const filas = lectura.estudiantes.length + lectura.errores.filter((e) => e.fila > 1).length;
+    const errores = lectura.errores.slice(0, MAX_ERRORES_GUARDADOS);
+    const base = { archivo: nombre, filas, errores, totalErrores: lectura.errores.length, ignoradas: lectura.ignoradas };
 
     if (lectura.estudiantes.length === 0) {
-      return {
-        archivo: nombre,
-        filas,
-        nuevos: 0,
-        actualizados: 0,
-        errores: lectura.errores.slice(0, MAX_ERRORES_GUARDADOS),
-        totalErrores: lectura.errores.length,
-        ignoradas: lectura.ignoradas,
-        modelo: { estado: "INSUFICIENTE", motivo: "No se cargó ningún estudiante." },
-        evaluados: 0,
-      };
+      return { ...base, nuevos: 0, actualizados: 0, modelo: { estado: "INSUFICIENTE", motivo: "No se cargó ningún estudiante." }, evaluados: 0 };
     }
 
     const carga = await prisma.carga.create({
-      data: { archivo: nombre.slice(0, 200), filas, nuevos: 0, actualizados: 0, errores: lectura.errores.slice(0, MAX_ERRORES_GUARDADOS) as unknown as Prisma.InputJsonValue, usuarioId },
+      data: { archivo: nombre.slice(0, MAX_LARGO_NOMBRE_ARCHIVO), filas, nuevos: 0, actualizados: 0, errores: errores as unknown as Prisma.InputJsonValue, usuarioId },
     });
     const { nuevos, actualizados } = await guardar(lectura.estudiantes, carga.id);
     await prisma.carga.update({ where: { id: carga.id }, data: { nuevos, actualizados } });
 
     const modelo = await this.evaluacion.entrenar();
     const { evaluados } = await this.evaluacion.recalcular();
-    return {
-      archivo: nombre,
-      filas,
-      nuevos,
-      actualizados,
-      errores: lectura.errores.slice(0, MAX_ERRORES_GUARDADOS),
-      totalErrores: lectura.errores.length,
-      ignoradas: lectura.ignoradas,
-      modelo,
-      evaluados,
-    };
+    return { ...base, nuevos, actualizados, modelo, evaluados };
   }
 
   async historial(limite = 20) {
