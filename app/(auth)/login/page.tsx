@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { rutaInicial } from "@/lib/rbac";
+import { RUTA_INICIAL } from "@/lib/rbac";
 import { FormularioLogin } from "@/components/layout/FormularioLogin";
 import { EtiquetaCodigo } from "@/components/comunes/Codigo";
 import { Ceja } from "@/components/comunes/Encabezado";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({ searchParams }: { searchParams: { callbackUrl?: string; motivo?: string } }) {
   const session = await getServerSession(authOptions);
   // Una sesión revocada (cuenta desactivada) no redirige: se muestra el aviso y se puede entrar con otra cuenta
-  if (session && !session.revocada) redirect(rutaInicial(session.user.rol));
+  if (session && !session.revocada) redirect(RUTA_INICIAL);
 
   return (
     <div className="flex min-h-screen flex-col">

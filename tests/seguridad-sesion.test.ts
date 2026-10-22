@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { revalidarSesion } from "@/lib/seguridad/sesion";
-import { puedeAcceder, rutaInicial } from "@/lib/rbac";
+import { RUTA_INICIAL, puedeAcceder } from "@/lib/rbac";
 import { esRol } from "@/lib/roles";
 
 describe("revalidarSesion", () => {
@@ -32,8 +32,8 @@ describe("permisos por rol", () => {
 
   it("el administrador entra a todo y los dos roles empiezan en /inicio", () => {
     for (const r of ["/inicio", "/cargar", "/usuarios", "/api/cargas", "/agente"]) expect(puedeAcceder(r, "ADMIN")).toBe(true);
-    expect(rutaInicial("ADMIN")).toBe("/inicio");
-    expect(rutaInicial("BIENESTAR")).toBe("/inicio");
+    expect(RUTA_INICIAL).toBe("/inicio");
+    for (const rol of ["ADMIN", "BIENESTAR"] as const) expect(puedeAcceder(RUTA_INICIAL, rol)).toBe(true);
   });
 
   it("un prefijo parecido no hereda el permiso (/cargarx no es /cargar)", () => {

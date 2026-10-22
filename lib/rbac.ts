@@ -2,7 +2,7 @@ import type { Rol } from "./roles";
 
 /**
  * Control de acceso por rol (RBAC) — fuente única de verdad.
- * La usan: el middleware (rutas), el menú lateral y los endpoints de la API.
+ * La usan: el middleware (rutas), el layout y los endpoints de la API.
  * Es una lista de prefijos: gana el prefijo más largo que coincida.
  *
  * Habeas data (Ley 1581/2012): solo el personal autorizado (ADMIN y BIENESTAR) inicia sesión;
@@ -36,6 +36,4 @@ export function puedeAcceder(pathname: string, rol: Rol): boolean {
 }
 
 /** Página de inicio después de iniciar sesión (igual para los dos roles) */
-export function rutaInicial(_rol: Rol): string {
-  return "/inicio";
-}
+export const RUTA_INICIAL = "/inicio";
