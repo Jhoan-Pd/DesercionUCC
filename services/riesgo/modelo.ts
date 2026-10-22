@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { formatoNumero } from "@/lib/formato";
 import { EntrenadorLogistico } from "./EntrenadorLogistico";
-import { calcularMetricas, esDePrueba } from "./metricas";
+import { calcularMetricas, esDePrueba, type MetricasModelo } from "./metricas";
 import type { FactorRiesgo, ResultadoRiesgo } from "./factores";
 import { nivelSegunUmbrales } from "./niveles";
 import { CLAVES_VARIABLES, VARIABLE, VARIABLES, tieneValor, type ClaveVariable, type DatosEstudiante } from "./variables";
@@ -132,16 +132,15 @@ export function entrenarModelo(registros: RegistroConResultado[], version: strin
   }
 
   // Evaluación honesta: se ajusta con el 80 % y se mide con el 20 % restante (por código de estudiante)
-  const prueba = registros.filter((r) => esDePrueba(r.codigo));
-  const entrenamiento = registros.filter((r) => !esDePrueba(r.codigo));
-  const eval_ = ajustar(entrenamiento, variables, `${version}-eval`);
+  const { prueba, entrenamiento } = separarPorCodigo(registros);
+  const evaluacion = ajustar(entrenamiento, variables, `${version}-eval`);
   const yPrueba = prueba.map((r) => (r.retirado ? 1 : 0));
-  const pPrueba = prueba.map((r) => probabilidad(eval_.definicion, r.datos).p);
-  const m = calcularMetricas(pPrueba, yPrueba, eval_.definicion.umbrales.alto);
+  const pPrueba = prueba.map((r) => probabilidad(evaluacion.definicion, r.datos).p);
+  const m = calcularMetricas(pPrueba, yPrueba, evaluacion.definicion.umbrales.alto);
 
   // Modelo final con todos los datos
   const final = ajustar(registros, variables, version);
-  const convergio = eval_.convergio && final.convergio;
+  const convergio = evaluacion.convergio && final.convergio;
   const metricas: MetricasEntrenamiento = {
     estudiantes: registros.length,
     retirados,
@@ -155,20 +154,31 @@ export function entrenarModelo(registros: RegistroConResultado[], version: strin
     variables,
     entrenadoEn: fecha.toISOString(),
   };
+  return { estado: "ENTRENADO", ...decidirActivacion(m, convergio), definicion: final.definicion, metricas };
+}
+
+/** Separa en una sola pasada los estudiantes de prueba (20 %, fijo por código) y los de entrenamiento */
+function separarPorCodigo(registros: RegistroConResultado[]) {
+  const prueba: RegistroConResultado[] = [];
+  const entrenamiento: RegistroConResultado[] = [];
+  for (const r of registros) (esDePrueba(r.codigo) ? prueba : entrenamiento).push(r);
+  return { prueba, entrenamiento };
+}
+
+/** Mínimo de retirados en la muestra de prueba para confiar en el AUC */
+const MINIMO_RETIRADOS_PRUEBA = 10;
+
+/** Regla de activación del modelo, con el motivo que se muestra en pantalla */
+export function decidirActivacion(m: Pick<MetricasModelo, "auc" | "positivos" | "n">, convergio: boolean): { activable: boolean; motivo: string } {
   const aucTxt = Number.isFinite(m.auc) ? formatoNumero(m.auc, { max: 3 }) : "sin calcular";
-  let activable = true;
-  let motivo = `El modelo distingue bien a quienes se retiraron (AUC ${aucTxt} con estudiantes que no usó para aprender).`;
-  if (!convergio) {
-    activable = false;
-    motivo = "El entrenamiento no convergió; se mantiene el puntaje por factores.";
-  } else if (!Number.isFinite(m.auc) || m.positivos < 10 || m.positivos === m.n) {
-    activable = false;
-    motivo = "La muestra de prueba no tiene suficientes retirados y graduados para evaluar el modelo; se mantiene el puntaje por factores.";
-  } else if (m.auc < AUC_MINIMO) {
-    activable = false;
-    motivo = `El modelo no discrimina lo suficiente (AUC ${aucTxt} < ${formatoNumero(AUC_MINIMO)}); se mantiene el puntaje por factores.`;
+  if (!convergio) return { activable: false, motivo: "El entrenamiento no convergió; se mantiene el puntaje por factores." };
+  if (!Number.isFinite(m.auc) || m.positivos < MINIMO_RETIRADOS_PRUEBA || m.positivos === m.n) {
+    return { activable: false, motivo: "La muestra de prueba no tiene suficientes retirados y graduados para evaluar el modelo; se mantiene el puntaje por factores." };
   }
-  return { estado: "ENTRENADO", activable, motivo, definicion: final.definicion, metricas };
+  if (m.auc < AUC_MINIMO) {
+    return { activable: false, motivo: `El modelo no discrimina lo suficiente (AUC ${aucTxt} < ${formatoNumero(AUC_MINIMO)}); se mantiene el puntaje por factores.` };
+  }
+  return { activable: true, motivo: `El modelo distingue bien a quienes se retiraron (AUC ${aucTxt} con estudiantes que no usó para aprender).` };
 }
 
 /**
@@ -193,12 +203,12 @@ export function predecirConModelo(def: DefinicionModelo, d: DatosEstudiante): Re
       const puntos = Math.round(100 * (exceso > 0 ? (exceso * positivos[i]) / sumaPositivos : p - sigmoide(logit - aportes[i])));
       if (puntos < 1) return null;
       const valor = d[clave] as number | boolean;
-      const def_ = VARIABLE[clave];
+      const variable = VARIABLE[clave];
       const detalle =
         typeof valor === "boolean"
-          ? `${def_.formato(valor)}; en la UCC lo tiene el ${Math.round(def.medias[i] * 100)} % de los estudiantes con resultado conocido.`
-          : `${def_.formato(valor)} frente a ${def_.formato(def.medias[i])} en promedio en la UCC.`;
-      return { clave, etiqueta: def_.etiqueta, puntos, detalle };
+          ? `${variable.formato(valor)}; en la UCC lo tiene el ${Math.round(def.medias[i] * 100)} % de los estudiantes con resultado conocido.`
+          : `${variable.formato(valor)} frente a ${variable.formato(def.medias[i])} en promedio en la UCC.`;
+      return { clave, etiqueta: variable.etiqueta, puntos, detalle };
     })
     .filter((f): f is FactorRiesgo => f !== null)
     .sort((a, b) => b.puntos - a.puntos);

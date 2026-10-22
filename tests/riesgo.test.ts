@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { REGLAS, nivelPorPuntaje, puntajePorFactores } from "@/services/riesgo/factores";
-import { MINIMO_ENTRENAMIENTO, entrenarModelo, predecirConModelo, variablesUtilizables, type RegistroConResultado } from "@/services/riesgo/modelo";
+import { MINIMO_ENTRENAMIENTO, decidirActivacion, entrenarModelo, predecirConModelo, variablesUtilizables, type RegistroConResultado } from "@/services/riesgo/modelo";
 import { auc } from "@/services/riesgo/metricas";
 
 describe("Puntaje por factores", () => {
@@ -111,5 +111,15 @@ describe("Modelo entrenado con estudiantes que ya tienen resultado", () => {
   it("AUC: 1 cuando ordena perfecto y 0,5 con empates", () => {
     expect(auc([0.1, 0.2, 0.8, 0.9], [0, 0, 1, 1])).toBe(1);
     expect(auc([0.5, 0.5, 0.5, 0.5], [0, 1, 0, 1])).toBe(0.5);
+  });
+});
+
+describe("regla de activación del modelo", () => {
+  it("solo activa un modelo que convergió, con suficientes retirados en la prueba y AUC ≥ 0,70", () => {
+    expect(decidirActivacion({ auc: 0.85, positivos: 20, n: 80 }, true).activable).toBe(true);
+    expect(decidirActivacion({ auc: 0.85, positivos: 20, n: 80 }, false).motivo).toContain("no convergió");
+    expect(decidirActivacion({ auc: 0.85, positivos: 5, n: 80 }, true).motivo).toContain("no tiene suficientes retirados");
+    expect(decidirActivacion({ auc: Number.NaN, positivos: 20, n: 80 }, true).activable).toBe(false);
+    expect(decidirActivacion({ auc: 0.65, positivos: 20, n: 80 }, true).motivo).toContain("0,65 < 0,7");
   });
 });
