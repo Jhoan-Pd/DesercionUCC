@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import { PALETA } from "./lib/paleta";
 
 /**
  * Estilo editorial: fondo papel, tinta grafito, títulos en serif (Cormorant Garamond),
@@ -16,33 +17,7 @@ const config: Config = {
         mono: ['"SF Mono"', '"Fira Code"', "Consolas", "ui-monospace", "monospace"],
       },
       colors: {
-        // Neutros
-        tinta: "#303030",
-        grafito: "#505050",
-        piedra: "#6E6E6E",
-        papel: "#F9F9F9",
-        // Acentos
-        petroleo: "#2B7983",
-        pino: "#234F46",
-        salvia: "#84A98C",
-        marino: "#234F65",
-        coral: "#D91642",
-        // Fondos pastel para etiquetas y avisos
-        bruma: "#DCE6ED",
-        hoja: "#E7EDE8",
-        agua: "#C8DBD7",
-        // Niveles de riesgo (fondo, texto y borde), siempre acompañados de texto e ícono
-        riesgo: {
-          "alto-fondo": "#F7E1E6",
-          alto: "#9E1235",
-          "alto-borde": "#EDC2CC",
-          "medio-fondo": "#F4EBD9",
-          medio: "#7A5410",
-          "medio-borde": "#E5D2AA",
-          "bajo-fondo": "#E7EDE8",
-          bajo: "#234F46",
-          "bajo-borde": "#C8DBD7",
-        },
+        ...PALETA,
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

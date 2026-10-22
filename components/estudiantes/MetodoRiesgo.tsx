@@ -7,7 +7,7 @@ import { formatoNumero } from "@/lib/formato";
 export function MetodoRiesgo({ modelo }: { modelo: EstadoModelo }) {
   const auc = modelo.metricas?.auc;
   return (
-    <div className="flex gap-3 rounded-lg border border-bruma bg-[#EEF3F6] p-5 text-sm leading-relaxed text-marino">
+    <div className="flex gap-3 rounded-lg border border-bruma bg-niebla p-5 text-sm leading-relaxed text-marino">
       <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
       <div className="space-y-1">
         {modelo.metodo === "MODELO" ? (

@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import type { TablaCSV } from "./csv";
+import { PALETA } from "@/lib/paleta";
 import { COLUMNAS, ENCABEZADOS_PLANTILLA } from "./lector";
 
 /** Convierte la primera hoja de un archivo .xlsx en la misma tabla que produce el lector de CSV */
@@ -45,7 +46,7 @@ export async function plantillaExcel(): Promise<Buffer> {
   const hoja = libro.addWorksheet("Estudiantes");
   hoja.addRow(ENCABEZADOS_PLANTILLA);
   hoja.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-  hoja.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF00549F" } };
+  hoja.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${PALETA.tinta.slice(1)}` } };
   hoja.columns.forEach((c) => (c.width = 18));
   hoja.views = [{ state: "frozen", ySplit: 1 }];
 

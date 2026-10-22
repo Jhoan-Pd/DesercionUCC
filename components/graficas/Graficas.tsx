@@ -1,7 +1,7 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { COLOR } from "@/lib/colores";
+import { COLOR_GRAFICA as COLOR } from "@/lib/paleta";
 import { formatoNumero } from "@/lib/formato";
 
 /** Recharts llama al formateador con (valor, índice): se envuelve para no pasar el índice como decimales */

@@ -1,5 +1,6 @@
-import { AlertOctagon, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { COLOR_NIVEL } from "./NivelBadge";
+import { COLOR_NIVEL } from "@/lib/paleta";
+import { ETIQUETA_NIVEL, NIVELES } from "@/services/riesgo/niveles";
+import { ICONO_NIVEL } from "./NivelBadge";
 
 /** Barra apilada alto/medio/bajo de un programa (con texto accesible) */
 export function BarraNiveles({ alto, medio, bajo }: { alto: number; medio: number; bajo: number }) {
@@ -22,15 +23,14 @@ export function BarraNiveles({ alto, medio, bajo }: { alto: number; medio: numbe
 export function LeyendaNiveles() {
   return (
     <div className="flex flex-wrap gap-5 text-[11px] font-semibold uppercase tracking-[0.12em] text-grafito">
-      <span className="inline-flex items-center gap-1">
-        <AlertOctagon className="h-3.5 w-3.5" style={{ color: COLOR_NIVEL.ALTO }} aria-hidden /> Alto
-      </span>
-      <span className="inline-flex items-center gap-1">
-        <AlertTriangle className="h-3.5 w-3.5" style={{ color: COLOR_NIVEL.MEDIO }} aria-hidden /> Medio
-      </span>
-      <span className="inline-flex items-center gap-1">
-        <CheckCircle2 className="h-3.5 w-3.5" style={{ color: COLOR_NIVEL.BAJO }} aria-hidden /> Bajo
-      </span>
+      {NIVELES.map((nivel) => {
+        const Icono = ICONO_NIVEL[nivel];
+        return (
+          <span key={nivel} className="inline-flex items-center gap-1">
+            <Icono className="h-3.5 w-3.5" style={{ color: COLOR_NIVEL[nivel] }} aria-hidden /> {ETIQUETA_NIVEL[nivel]}
+          </span>
+        );
+      })}
     </div>
   );
 }
