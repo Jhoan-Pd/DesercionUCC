@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Evaluacion, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { crearCalculadora } from "./calculadora";
@@ -65,7 +66,9 @@ export class ServicioEvaluacion {
    */
   async entrenar(tx: ClienteBD, fecha = new Date()): Promise<{ estado: "INSUFICIENTE" | "ACTIVADO" | "NO_ACTIVADO"; motivo: string }> {
     const conResultado = await tx.estudiante.findMany({ where: { estado: { in: ["RETIRADO", "GRADUADO"] } } });
-    const version = `ucc-${fecha.toISOString().slice(0, 19).replace(/[-:T]/g, "")}`;
+    // La versión es única: con dos cargas seguidas en el mismo segundo, el nombre solo con la hora
+    // chocaba (P2002) y la segunda carga entera se deshacía. El sufijo aleatorio lo evita.
+    const version = `ucc-${fecha.toISOString().slice(0, 19).replace(/[-:T]/g, "")}-${randomUUID().slice(0, 4)}`;
     const r = entrenarModelo(
       conResultado.map((e) => ({ codigo: e.codigo, datos: datosDe(e), retirado: e.estado === "RETIRADO" })),
       version,
