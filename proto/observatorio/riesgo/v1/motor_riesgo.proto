@@ -1,0 +1,116 @@
+// Contrato del motor de riesgo del Observatorio de Deserción UCC.
+//
+// Es la fuente única de verdad de la API gRPC: a partir de este archivo `buf generate` escribe los
+// tipos y el descriptor del servicio en TypeScript (lib/grpc/gen). El mismo servicio se publica:
+//   - dentro de Next.js, en /api/grpc, con los protocolos Connect y gRPC-Web (HTTP/1.1, sirve en Vercel);
+//   - en un servidor propio HTTP/2 (servidor-grpc/), que además habla gRPC «puro».
+//
+// Ley 1581 de 2012: ningún mensaje lleva nombres ni documentos. Los estudiantes viajan por código.
+syntax = "proto3";
+
+package observatorio.riesgo.v1;
+
+// Variables académicas y socioeconómicas que usa el cálculo del riesgo.
+// Todas menos el semestre son opcionales (proto3 `optional`): un dato que no viene no se evalúa y se
+// informa como faltante; nunca se reemplaza por un valor inventado.
+message DatosEstudiante {
+  uint32 semestre = 1;
+  optional double promedio = 2;
+  optional uint32 materias_perdidas = 3;
+  optional double asistencia = 4;
+  optional uint32 estrato = 5;
+  optional bool trabaja = 6;
+  optional bool apoyo_financiero = 7;
+  optional bool mora_matricula = 8;
+  optional uint32 puntaje_saber11 = 9;
+  optional uint32 edad = 10;
+}
+
+enum NivelRiesgo {
+  NIVEL_RIESGO_UNSPECIFIED = 0;
+  NIVEL_RIESGO_BAJO = 1;
+  NIVEL_RIESGO_MEDIO = 2;
+  NIVEL_RIESGO_ALTO = 3;
+}
+
+enum MetodoRiesgo {
+  METODO_RIESGO_UNSPECIFIED = 0;
+  // Puntaje por factores documentados (MEN-SPADIES), mientras no haya un modelo entrenado
+  METODO_RIESGO_FACTORES = 1;
+  // Regresión logística entrenada con estudiantes de la UCC que ya se retiraron o se graduaron
+  METODO_RIESGO_MODELO = 2;
+}
+
+message Factor {
+  string clave = 1;
+  string etiqueta = 2;
+  // Puntos que aporta al puntaje de 0 a 100
+  int32 puntos = 3;
+  string detalle = 4;
+}
+
+message EvaluarRequest {
+  DatosEstudiante datos = 1;
+}
+
+message EvaluarResponse {
+  // 0 a 100
+  uint32 puntaje = 1;
+  NivelRiesgo nivel = 2;
+  MetodoRiesgo metodo = 3;
+  // Versión del modelo (vacía con el puntaje por factores)
+  string version_modelo = 4;
+  repeated Factor factores = 5;
+  // Variables que no venían en la petición
+  repeated string faltantes = 6;
+}
+
+message ObtenerResumenRequest {}
+
+message ResumenPrograma {
+  string programa = 1;
+  uint32 total = 2;
+  uint32 alto = 3;
+  uint32 medio = 4;
+  uint32 bajo = 5;
+}
+
+message ObtenerResumenResponse {
+  uint32 activos = 1;
+  uint32 alto = 2;
+  uint32 medio = 3;
+  uint32 bajo = 4;
+  MetodoRiesgo metodo = 5;
+  repeated ResumenPrograma programas = 6;
+}
+
+message ListarEnRiesgoRequest {
+  // Nivel mínimo que se incluye (por defecto, MEDIO)
+  NivelRiesgo nivel_minimo = 1;
+  // Máximo de estudiantes (1 a 500; por defecto 100)
+  uint32 limite = 2;
+}
+
+message EstudianteEnRiesgo {
+  string codigo = 1;
+  string programa = 2;
+  uint32 semestre = 3;
+  uint32 puntaje = 4;
+  NivelRiesgo nivel = 5;
+  // Etiquetas de los factores que más pesan
+  repeated string factores = 6;
+}
+
+// Cada mensaje del flujo trae un estudiante
+message ListarEnRiesgoResponse {
+  EstudianteEnRiesgo estudiante = 1;
+}
+
+service MotorRiesgoService {
+  // Calcula el riesgo de unos datos con el método vigente, sin guardar nada (simulador «¿y si…?»)
+  rpc Evaluar(EvaluarRequest) returns (EvaluarResponse);
+  // Conteo de estudiantes activos por nivel y programa
+  rpc ObtenerResumen(ObtenerResumenRequest) returns (ObtenerResumenResponse);
+  // Server streaming: envía los estudiantes del mayor al menor riesgo a medida que se leen de la base
+  rpc ListarEnRiesgo(ListarEnRiesgoRequest) returns (stream ListarEnRiesgoResponse);
+}
