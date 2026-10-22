@@ -51,7 +51,13 @@ export class ServicioExplicacion {
       const texto = textoDe(partes);
       if (!texto) return basica("Gemini no devolvió texto; se muestra la explicación calculada por el sistema.");
       const ahora = new Date();
-      await prisma.evaluacion.update({ where: { id: ev.id }, data: { explicacion: texto, explicadaEn: ahora, modeloIa: this.cliente.nombreModelo } });
+      // updateMany y no update: si una carga reemplazó la evaluación mientras Gemini respondía (hasta
+      // 50 s), update fallaba con P2025 y se perdía el texto con un error 500. La explicación de una
+      // evaluación que ya no existe no se guarda, pero se muestra con un aviso.
+      const guardada = await prisma.evaluacion.updateMany({ where: { id: ev.id }, data: { explicacion: texto, explicadaEn: ahora, modeloIa: this.cliente.nombreModelo } });
+      if (guardada.count === 0) {
+        return { explicacion: texto, origen: "IA", modeloIa: this.cliente.nombreModelo, explicadaEn: null, aviso: "El riesgo se recalculó mientras se redactaba esta explicación. Vuelve a generarla para que use los datos nuevos." };
+      }
       return { explicacion: texto, origen: "IA", modeloIa: this.cliente.nombreModelo, explicadaEn: ahora.toISOString(), aviso: null };
     } catch (err) {
       if (err instanceof ErrorIA) return basica(`${err.message} Mientras tanto, esta es la explicación calculada por el sistema.`);
