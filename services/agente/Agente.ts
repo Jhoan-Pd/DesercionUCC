@@ -32,12 +32,10 @@ Reglas:
 }
 
 /** Códigos de estudiantes conocidos que aparecen en el texto */
-export function codigosMencionados(texto: string, conocidos: Set<string>): string[] {
-  const encontrados: string[] = [];
-  for (const token of texto.match(/[A-Za-z0-9][A-Za-z0-9._-]*[A-Za-z0-9]|\d/g) ?? []) {
-    if (conocidos.has(token) && !encontrados.includes(token)) encontrados.push(token);
-  }
-  return encontrados;
+export function codigosMencionados(texto: string, conocidos: ReadonlySet<string>): string[] {
+  const tokens = texto.match(/[A-Za-z0-9][A-Za-z0-9._-]*[A-Za-z0-9]|\d/g) ?? [];
+  // Set: sin repetidos y en el orden en que aparecen en el texto
+  return [...new Set(tokens.filter((t) => conocidos.has(t)))];
 }
 
 /** Recorre recursivamente una respuesta de herramienta y junta los códigos de estudiante */

@@ -1,23 +1,28 @@
 import type { FactorRiesgo, NivelRiesgo } from "@/services/riesgo/factores";
 import { VARIABLE, describirValor, tieneValor, type ClaveVariable, type DatosEstudiante } from "@/services/riesgo/variables";
 
+const APOYO_ECONOMICO = "Verificar si cumple los requisitos de los apoyos económicos de la universidad (becas, subsidios, crédito).";
+const PRIMER_ANIO = "Incluirlo en el acompañamiento de primer año (inducción, mentorías entre pares).";
+const NIVELACION = "Ofrecer cursos de nivelación en competencias básicas (lectura, matemáticas).";
+
 /**
- * Acciones de Bienestar sugeridas para cada factor (clave del puntaje por factores o variable del modelo).
+ * Acciones de Bienestar sugeridas para cada factor. La clave es la regla del puntaje por factores
+ * (p. ej. "saber11") o la variable del modelo (p. ej. "puntajeSaber11"): por eso varias comparten texto.
  * Se usan en la explicación básica y como guía para el agente.
  */
-export const ACCIONES: Record<string, string> = {
+export const ACCIONES: Readonly<Record<string, string>> = {
   promedio: "Tutoría o monitoría en las materias con dificultad y un plan de mejoramiento con su consejero académico.",
   materiasPerdidas: "Revisar con el estudiante las materias perdidas y su carga del próximo periodo; ofrecer tutorías.",
   asistencia: "Contactarlo para conocer la causa de las inasistencias (salud, trabajo, transporte, motivación).",
   moraMatricula: "Orientarlo sobre acuerdos de pago, créditos educativos o becas disponibles.",
-  vulnerabilidadEconomica: "Verificar si cumple los requisitos de los apoyos económicos de la universidad (becas, subsidios, crédito).",
-  estrato: "Verificar si cumple los requisitos de los apoyos económicos de la universidad (becas, subsidios, crédito).",
-  apoyoFinanciero: "Verificar si cumple los requisitos de los apoyos económicos de la universidad (becas, subsidios, crédito).",
+  vulnerabilidadEconomica: APOYO_ECONOMICO,
+  estrato: APOYO_ECONOMICO,
+  apoyoFinanciero: APOYO_ECONOMICO,
   trabaja: "Explorar horarios o una carga académica compatible con su trabajo.",
-  primerosSemestres: "Incluirlo en el acompañamiento de primer año (inducción, mentorías entre pares).",
-  semestre: "Incluirlo en el acompañamiento de primer año (inducción, mentorías entre pares).",
-  saber11: "Ofrecer cursos de nivelación en competencias básicas (lectura, matemáticas).",
-  puntajeSaber11: "Ofrecer cursos de nivelación en competencias básicas (lectura, matemáticas).",
+  primerosSemestres: PRIMER_ANIO,
+  semestre: PRIMER_ANIO,
+  saber11: NIVELACION,
+  puntajeSaber11: NIVELACION,
   edad: "Conversar sobre sus responsabilidades fuera de la universidad y los apoyos que necesita.",
 };
 
@@ -35,13 +40,14 @@ export interface EntradaExplicacion {
 
 /** Acciones sin repetir, en el orden de los factores */
 export function accionesSugeridas(factores: FactorRiesgo[], maximo = 3): string[] {
-  const acciones: string[] = [];
+  // Un Set conserva el orden de inserción y descarta repetidas en O(1)
+  const acciones = new Set<string>();
   for (const f of factores) {
+    if (acciones.size >= maximo) break;
     const a = ACCIONES[f.clave];
-    if (a && !acciones.includes(a)) acciones.push(a);
-    if (acciones.length >= maximo) break;
+    if (a) acciones.add(a);
   }
-  return acciones;
+  return [...acciones];
 }
 
 /** Explicación sin IA (se usa si no hay clave de Gemini o si Gemini falla). Determinista y verificable. */
