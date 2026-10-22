@@ -1,6 +1,7 @@
 import type { NivelRiesgo } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { claveNombre, resumenUccPasto } from "@/lib/datos-abiertos";
+import { resumenUccPasto } from "@/lib/datos-abiertos";
+import { claveNombre } from "@/lib/texto";
 import { ServicioEstudiantes, factoresDe } from "@/services/estudiantes/ServicioEstudiantes";
 import type { Herramientas } from "./declaraciones";
 

@@ -1,4 +1,5 @@
 import datos from "@/data/datos-abiertos/ucc.json";
+import { claveNombre, formatoTitulo } from "@/lib/texto";
 
 /**
  * Cifras oficiales de la UCC tomadas de datos.gov.co (Ministerio de Educación Nacional).
@@ -43,29 +44,6 @@ export const DATOS_UCC = datos as unknown as DatosAbiertosUcc;
 
 /** Niveles de formación del SNIES que son pregrado (técnica profesional, tecnológica y universitaria) */
 const NIVELES_PREGRADO = new Set(["3", "4", "5", "6"]);
-
-const PALABRAS_MENORES = new Set(["de", "del", "la", "las", "los", "y", "e", "en", "a", "con", "para", "por"]);
-
-/** Clave para agrupar nombres que solo difieren en mayúsculas o tildes ("ODONTOLOGIA" = "Odontología") */
-export function claveNombre(nombre: string): string {
-  return nombre
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toUpperCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/** "ESPECIALIZACIÓN EN DERECHO PROCESAL PENAL" -> "Especialización en Derecho Procesal Penal" */
-export function formatoTitulo(nombre: string): string {
-  return nombre
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim()
-    .split(" ")
-    .map((p, i) => (i > 0 && PALABRAS_MENORES.has(p) ? p : p.charAt(0).toUpperCase() + p.slice(1)))
-    .join(" ");
-}
 
 /** Entre varias escrituras del mismo nombre, prefiere la que tiene tildes (la más completa) */
 function mejorEscritura(variantes: Iterable<string>): string {

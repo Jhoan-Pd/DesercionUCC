@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DATOS_UCC, claveNombre, formatoTitulo, matriculaPorAnio, matriculaPorPrograma, resumenUccPasto, variacion } from "@/lib/datos-abiertos";
+import { DATOS_UCC, matriculaPorAnio, matriculaPorPrograma, resumenUccPasto, variacion } from "@/lib/datos-abiertos";
+import { claveNombre, formatoTitulo } from "@/lib/texto";
 import { depurarMatricula, esUcc, programasActivosUccPasto, totalPorAnio, totalPorCampus, type FilaMatriculaMen, type FilaProgramaMen } from "@/lib/datos-abiertos-depuracion";
 
 const fila = (p: Partial<FilaMatriculaMen>): FilaMatriculaMen => ({

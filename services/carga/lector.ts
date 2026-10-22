@@ -1,3 +1,4 @@
+import { formatoTitulo, normalizarValor } from "@/lib/texto";
 import { normalizarEncabezado, parsearCSV, type TablaCSV } from "./csv";
 
 /**
@@ -86,11 +87,7 @@ const FALSO = new Set(["no", "n", "0", "false", "falso"]);
 
 /** "Sí" -> true ; "no" -> false ; "" -> null ; otro -> undefined (inválido) */
 export function leerBooleano(valor: string): boolean | null | undefined {
-  const t = valor
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .trim()
-    .toLowerCase();
+  const t = normalizarValor(valor);
   if (t === "") return null;
   if (VERDADERO.has(t)) return true;
   if (FALSO.has(t)) return false;
@@ -98,11 +95,7 @@ export function leerBooleano(valor: string): boolean | null | undefined {
 }
 
 export function leerEstado(valor: string): EstadoArchivo | undefined {
-  const t = valor
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .trim()
-    .toLowerCase();
+  const t = normalizarValor(valor);
   if (t === "" || t === "activo" || t === "matriculado") return "ACTIVO";
   if (["retirado", "desertor", "deserto", "retiro", "cancelado"].includes(t)) return "RETIRADO";
   if (["graduado", "egresado"].includes(t)) return "GRADUADO";
@@ -136,18 +129,6 @@ const ETIQUETA: Record<keyof EstudianteArchivo, string> = {
   estado: "estado",
   periodo: "periodo",
 };
-
-/** Capitaliza el programa para que "DERECHO" y "derecho" queden igual */
-export function normalizarPrograma(p: string): string {
-  const menores = new Set(["de", "del", "la", "las", "los", "y", "e", "en"]);
-  return p
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase()
-    .split(" ")
-    .map((w, i) => (i > 0 && menores.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
-    .join(" ");
-}
 
 export const MAX_FILAS = 20000;
 
@@ -214,7 +195,7 @@ export function validarTabla(tabla: TablaCSV): ResultadoLectura {
     const e: EstudianteArchivo = {
       codigo,
       nombre,
-      programa: normalizarPrograma(programa),
+      programa: formatoTitulo(programa),
       semestre: semestre ?? 0,
       promedio: numero("promedio"),
       materiasPerdidas: numero("materiasPerdidas"),

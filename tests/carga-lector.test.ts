@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
-import { ENCABEZADOS_PLANTILLA, leerBooleano, leerCSV, leerEstado, leerNumero, normalizarPrograma, validarTabla } from "@/services/carga/lector";
+import { ENCABEZADOS_PLANTILLA, leerBooleano, leerCSV, leerEstado, leerNumero, validarTabla } from "@/services/carga/lector";
 import { leerExcel, plantillaExcel } from "@/services/carga/excel";
 
 const ENC = "codigo;nombre;programa;semestre;promedio;materias_perdidas;asistencia;estrato;trabaja;apoyo_financiero;mora_matricula;puntaje_saber11;edad;estado;periodo";
@@ -24,10 +24,6 @@ describe("Lectura de valores", () => {
 
   it("estado: vacío es activo; desertor equivale a retirado; egresado a graduado", () => {
     expect([leerEstado(""), leerEstado("Desertor"), leerEstado("egresado"), leerEstado("aplazado")]).toEqual(["ACTIVO", "RETIRADO", "GRADUADO", undefined]);
-  });
-
-  it("normaliza el nombre del programa", () => {
-    expect(normalizarPrograma("  INGENIERÍA   DE SOFTWARE ")).toBe("Ingeniería de Software");
   });
 });
 

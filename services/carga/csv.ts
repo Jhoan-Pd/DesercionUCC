@@ -1,3 +1,5 @@
+import { sinTildes } from "@/lib/texto";
+
 /**
  * Lector de CSV sin dependencias (RFC 4180): comillas dobles, comillas escapadas (""),
  * saltos de línea dentro de comillas, BOM de UTF-8 y finales de línea de Windows.
@@ -84,9 +86,7 @@ export function parsearCSV(texto: string): TablaCSV {
 
 /** Normaliza un encabezado: minúsculas, sin tildes, espacios y guiones como "_" ("Edad Ingreso" -> "edad_ingreso") */
 export function normalizarEncabezado(texto: string): string {
-  return texto
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+  return sinTildes(texto)
     .toLowerCase()
     .trim()
     .replace(/[\s-]+/g, "_")
