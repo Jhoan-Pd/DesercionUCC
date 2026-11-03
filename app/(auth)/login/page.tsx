@@ -6,6 +6,7 @@ import { FormularioLogin } from "@/components/layout/FormularioLogin";
 import { EtiquetaCodigo } from "@/components/comunes/Codigo";
 import { Ceja } from "@/components/comunes/Encabezado";
 import { Alert } from "@/components/ui/alert";
+import { CabeceraPublica } from "@/components/layout/CabeceraPublica";
 
 export const metadata = { title: "Iniciar sesión" };
 export const dynamic = "force-dynamic";
@@ -17,11 +18,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { call
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="bg-white/95 shadow-suave">
-        <p className="mx-auto flex h-[72px] max-w-[1200px] items-center justify-center px-4 text-[14px] uppercase tracking-[0.14em] text-tinta sm:text-[15px] lg:justify-start lg:px-8">
-          Observatorio <span aria-hidden className="mx-2">•</span> UCC Pasto
-        </p>
-      </header>
+      <CabeceraPublica enlaces={false} />
 
       <main className="mx-auto grid w-full max-w-[1200px] flex-1 items-center gap-12 px-4 py-12 sm:px-6 lg:grid-cols-[1.25fr_1fr] lg:gap-20 lg:px-8 lg:py-20">
         <section className="space-y-8">
