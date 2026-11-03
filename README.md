@@ -25,6 +25,10 @@ Proyecto final de la asignatura *Programación Orientada a la Web*.
 | **Cifras oficiales UCC** | Admin y Bienestar | Matrícula oficial de la sede Pasto 2015-2021 por año, programa y sexo, comparación entre sedes y programas activos. |
 | **Cargar datos** | Admin | Subir el archivo de estudiantes (Excel o CSV), plantilla, historial de cargas y borrado total. |
 | **Usuarios** | Admin | Crear cuentas, cambiar rol, activar o desactivar, restablecer contraseña y desbloquear. |
+| **Portada** (`/`) | Público | Presentación del observatorio y una cifra oficial. Página estática (SSG). |
+| **Datos abiertos** (`/datos-abiertos`) | Público | Las mismas cifras oficiales, sin iniciar sesión. Se regenera cada 24 h (ISR). |
+
+En la ficha, el **simulador «¿y si…?»** muestra cómo cambiaría el riesgo si cambia un dato (resolver la mora, subir el promedio); consulta el motor de riesgo por **gRPC-Web**. En *Cargar datos*, un **Web Worker** revisa el archivo en el navegador antes de subirlo.
 
 Hay dos roles: **Administrador** (carga datos y gestiona cuentas) y **Bienestar Universitario** (consulta el riesgo y usa el agente).
 
@@ -138,12 +142,22 @@ flowchart LR
     S --> DB[(PostgreSQL · Neon)]
     S --> G[Google Gemini API]
     L --> DA[data/datos-abiertos/ucc.json<br/>MEN · datos.gov.co]
+    MW -->|gRPC-Web · Protobuf| GW["/api/grpc<br/>MotorRiesgo"]
+    GW --> S
+    CLI[Cliente gRPC] -->|gRPC · HTTP/2| SG[servidor-grpc<br/>MotorRiesgo]
+    SG --> S
+    U -.->|postMessage| WW[Web Worker<br/>revisión del archivo]
+    P -.->|ISR cada 24 h| DGC[datos.gov.co]
 ```
 
 | Carpeta | Contenido |
 |---|---|
-| `app/(app)` | Páginas: inicio, estudiantes, agente, cifras-ucc, cargar, usuarios |
-| `app/api` | `cargas`, `estudiantes`, `agente`, `usuarios`, `auth` |
+| `app/(app)` | Páginas con sesión (SSR): inicio, estudiantes, agente, cifras-ucc, cargar, usuarios |
+| `app/(publico)` | Páginas públicas: portada (SSG) y datos abiertos (ISR) |
+| `app/api` | `cargas`, `estudiantes`, `agente`, `usuarios`, `auth` y `grpc` (gRPC-Web y Connect) |
+| `proto/`, `lib/grpc`, `services/grpc` | Contrato .proto, tipos generados, cliente del navegador e implementación del motor de riesgo |
+| `servidor-grpc/` | Servidor gRPC independiente sobre HTTP/2 |
+| `workers/` | Web Worker que revisa el archivo en el navegador y su protocolo de mensajes |
 | `services/carga` | Lector de CSV y Excel, validación y guardado por lotes (`INSERT … ON CONFLICT`) |
 | `services/riesgo` | Variables, puntaje por factores, modelo logístico y servicio que recalcula |
 | `services/agente` | Herramientas, ciclo de function calling y explicaciones |
@@ -168,7 +182,57 @@ flowchart LR
 
 ![Diagrama entidad-relación](docs/diagrama-er.png)
 
-## 6. Instalación local
+## 6. Programación orientada a la web
+
+### 6.1 Patrones de rendering
+
+Cada página usa el patrón que corresponde a sus datos, y lo dice al pie (`// generación estática (SSG) · generada en el build el …`).
+
+| Página | Patrón | Por qué | Cómo se comprueba |
+|---|---|---|---|
+| `/` portada | **SSG** (`force-static`) | No tiene datos personales ni cambia entre visitas: se genera una vez en el build y se sirve desde la CDN. | `Cache-Control: s-maxage=31536000` |
+| `/datos-abiertos` | **ISR** (`revalidate = 86400`) | Datos públicos que el MEN actualiza una vez al año. La visita recibe la versión guardada y, si pasaron 24 h, Next.js la regenera en segundo plano consultando datos.gov.co; si falla, usa el respaldo del repositorio. | `Cache-Control: s-maxage=86400, stale-while-revalidate` |
+| `/inicio`, `/estudiantes`, ficha, `/usuarios`, `/cargar` | **SSR** por petición | Datos personales y permisos por rol: el layout lee la sesión en cada petición y nada se guarda en la CDN. | `ƒ (Dynamic)` en `next build` |
+| `/cifras-ucc` | **SSR + caché de datos** | La página es dinámica (tiene sesión), pero la consulta a datos.gov.co sale de la caché de datos de Next.js, compartida con `/datos-abiertos`. | `fetch(…, { next: { revalidate } })` |
+| Simulador, chat del agente, vista previa de la carga | **CSR** (componentes de cliente) | Interacción inmediata: el navegador llama al servidor por gRPC-Web o JSON, o trabaja solo en un Web Worker. | Pestaña *Red* del navegador |
+
+Los componentes de servidor (React Server Components) consultan los servicios directamente, sin pasar por la API. El mismo componente `PanelCifras` se usa en una página ISR y en una SSR: no sabe cómo se generó la página.
+
+### 6.2 gRPC: el motor de riesgo como servicio
+
+El contrato está en [`proto/observatorio/riesgo/v1/motor_riesgo.proto`](proto/observatorio/riesgo/v1/motor_riesgo.proto); `npm run grpc:generar` (Buf + Protobuf-ES) escribe los tipos en `lib/grpc/gen`.
+
+| Método | Tipo de llamada | Qué hace |
+|---|---|---|
+| `Evaluar` | Unaria | Calcula el riesgo de unos datos con el método vigente, sin guardar nada (simulador). |
+| `ObtenerResumen` | Unaria | Estudiantes activos por nivel y programa. |
+| `ListarEnRiesgo` | **Streaming del servidor** | Envía los estudiantes uno por uno a medida que se leen de la base (generador asíncrono con cursor) y se detiene si el cliente corta. |
+
+La implementación (`services/grpc/MotorRiesgo.ts`) no sabe nada del transporte. Se publica de dos maneras:
+
+| Dónde | Protocolos | Autenticación | Para qué |
+|---|---|---|---|
+| `/api/grpc` dentro de Next.js | **gRPC-Web** y **Connect** sobre HTTP/1.1 | Cookie de sesión (misma que el resto) | Funciona en Vercel; lo usa el simulador del navegador con Protobuf binario (`application/grpc-web+proto`). |
+| `servidor-grpc/` (HTTP/2 propio) | **gRPC** puro, además de gRPC-Web y Connect | `authorization: Bearer <GRPC_TOKEN>` en la metadata, comparado en tiempo constante | Cualquier cliente gRPC (grpcurl, Postman, Go, Python). Vercel no aloja servidores HTTP/2 permanentes: corre en local o en un contenedor. |
+
+Dos **interceptores** hacen el trabajo de un middleware: autenticación (`UNAUTHENTICATED` si no hay credenciales) y traducción de errores (un `ErrorApi` 404 llega como `NOT_FOUND`, 422 como `FAILED_PRECONDITION`, etc., también a mitad de un flujo).
+
+```bash
+GRPC_TOKEN=$(openssl rand -hex 24) npm run grpc:servidor   # escucha en :50051
+GRPC_TOKEN=<el mismo> npm run grpc:cliente                  # llamadas unarias y el flujo de ListarEnRiesgo
+```
+
+### 6.3 Web Worker: revisar el archivo sin congelar la página
+
+Leer un Excel de miles de filas tarda más de un segundo; en el hilo principal la página dejaría de responder. `workers/validar-archivo.worker.ts` lo hace en otro hilo:
+
+- **Mismo código que el servidor:** usa `services/carga/archivo.ts` y `lector.ts`, así la vista previa coincide con lo que hará la carga. El servidor vuelve a validar todo; la vista previa es una ayuda, no un control de seguridad.
+- **Protocolo tipado:** los mensajes son una unión discriminada (`progreso` / `lista` / `error`) con un id por pedido; si el usuario elige otro archivo, la respuesta vieja se descarta.
+- **Sin copias:** el `ArrayBuffer` viaja *transferido* al worker, no copiado.
+- **Ciclo de vida** (`useValidacionArchivo`): el worker se crea la primera vez que hace falta, se termina y se reemplaza si llega un archivo mientras revisa otro, y se cierra al salir de la página. ExcelJS se carga con import dinámico solo si el archivo es Excel.
+- **Medido:** un Excel de 20.000 filas se revisa en 1,5 s mientras la página sigue pintando a 60 cuadros por segundo. El archivo no sale del equipo hasta que se presiona «Cargar».
+
+## 7. Instalación local
 
 Requisitos: Node 18.18 o superior y PostgreSQL (local o en Neon).
 
@@ -182,7 +246,7 @@ npm run dev                 # http://localhost:3000
 
 Entra con `admin@ucc.edu.co` (o el correo de `SEED_ADMIN_EMAIL`) y la contraseña de `SEED_ADMIN_PASSWORD`. Después carga el archivo de estudiantes desde *Cargar datos*.
 
-## 7. Variables de entorno
+## 8. Variables de entorno
 
 | Variable | Obligatoria | Para qué |
 |---|---|---|
@@ -193,8 +257,10 @@ Entra con `admin@ucc.edu.co` (o el correo de `SEED_ADMIN_EMAIL`) y la contraseñ
 | `SEED_ADMIN_EMAIL` | No | Correo del primer administrador (por defecto `admin@ucc.edu.co`) |
 | `GEMINI_API_KEY` | Para el agente | Clave gratuita de [Google AI Studio](https://aistudio.google.com/apikey) |
 | `GEMINI_MODEL` | No | Modelo de Gemini (por defecto `gemini-flash-latest`) |
+| `GRPC_TOKEN` | Para el servidor gRPC | Token de al menos 24 caracteres que exige `servidor-grpc/` (no se usa en Vercel) |
+| `GRPC_PUERTO` | No | Puerto del servidor gRPC (por defecto 50051) |
 
-## 8. Despliegue (Vercel + Neon)
+## 9. Despliegue (Vercel + Neon)
 
 1. Importa el repositorio en Vercel y conecta Neon desde *Storage*. La integración crea `DATABASE_URL` y `DATABASE_URL_UNPOOLED`.
 2. En *Settings → Environment Variables* agrega `NEXTAUTH_SECRET`, `SEED_ADMIN_PASSWORD` y `GEMINI_API_KEY`.
@@ -206,7 +272,7 @@ Entra con `admin@ucc.edu.co` (o el correo de `SEED_ADMIN_EMAIL`) y la contraseñ
 
 La migración `20261019000000_simplificacion_datos_reales` **borra las tablas de la versión 0.3**, que solo tenían datos simulados, y crea el esquema nuevo.
 
-## 9. Seguridad y Ley 1581 de 2012
+## 10. Seguridad y Ley 1581 de 2012
 
 - Solo personal autorizado inicia sesión, con contraseñas bcrypt.
 - Hay bloqueo de 15 minutos tras 5 intentos fallidos. El contador se actualiza con bloqueo de fila, así que muchos intentos a la vez no lo saltan.
@@ -218,7 +284,7 @@ La migración `20261019000000_simplificacion_datos_reales` **borra las tablas de
 - A la IA no se envían datos que identifiquen a la persona.
 - El borrado total de estudiantes es exclusivo del administrador y pide confirmación escrita.
 
-## 10. Pruebas
+## 11. Pruebas
 
 ```bash
 npm test          # Vitest
@@ -233,8 +299,11 @@ Las pruebas cubren:
 - **Cálculo del riesgo:** el puntaje por factores, y que el modelo aprende y solo se activa con AUC ≥ 0,70.
 - **Agente:** cliente de Gemini (plazo total, cuerpos que no llegan, respuestas cortadas, errores de clave) y ciclo de function calling, con respuestas simuladas; historial del chat.
 - **Permisos y seguridad:** los dos roles, las reglas de cuentas, la sesión (incluido el cambio de contraseña), el hash ficticio, el tamaño de los cuerpos y que el middleware proteja exactamente las rutas con regla.
+- **gRPC:** las llamadas unarias y el flujo del servidor (en memoria y de punta a punta por HTTP), el interceptor de autenticación, la traducción de errores a códigos gRPC y la conversión entre Protobuf y el dominio.
+- **Rendering y datos abiertos en vivo:** la descarga de datos.gov.co con su respaldo, que el `revalidate` de la página ISR coincida con la vigencia de la caché y que la portada estática no lea la sesión.
+- **Lectura compartida con el Web Worker:** formatos, CSV, Excel con import dinámico y errores de archivo.
 
-## 11. Historial de desarrollo (Git)
+## 12. Historial de desarrollo (Git)
 
 Cada funcionalidad se desarrolló en su propia rama y se integró a `main` con `--no-ff`. Los mensajes siguen *Conventional Commits* en español (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`). Etiquetas:
 
@@ -242,6 +311,7 @@ Cada funcionalidad se desarrolló en su propia rama y se integró a `main` con `
 - `v0.4.0`: solo datos reales y el agente de IA.
 - `v0.5.0`: diseño editorial.
 - `v0.6.0`: revisión profunda del código en cinco vueltas (arquitectura, clean code, estructuras de datos, patrones y robustez).
+- `v0.7.0`: programación orientada a la web: patrones de rendering (SSG, ISR, SSR, CSR), gRPC y Web Worker.
 
 ```bash
 git log --oneline --graph --decorate
