@@ -17,6 +17,13 @@ import { DATOS_UCC, type DatosAbiertosUcc } from "./datos-abiertos";
  * misma depuración (lib/datos-abiertos-depuracion.ts).
  */
 const API = "https://www.datos.gov.co";
+/**
+ * Cada cuánto se vuelven a consultar las cifras (el MEN las actualiza una vez al año): 24 horas.
+ * La página pública repite este valor como literal en `export const revalidate`, porque Next.js
+ * exige un número escrito tal cual (una prueba verifica que coincidan).
+ */
+export const VIGENCIA_DATOS_ABIERTOS_S = 86_400;
+
 /** datos.gov.co a veces tarda: una regeneración no debe quedarse colgada */
 const TIEMPO_MAXIMO_MS = 15_000;
 
