@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { modulosParaRol } from "@/lib/modulos";
 import { puedeAcceder } from "@/lib/rbac";
 import { Navegacion } from "@/components/layout/Navegacion";
+import { ModoRender } from "@/components/comunes/ModoRender";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +24,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Navegacion modulos={modulosParaRol(rol)} usuario={{ nombre: name ?? "Usuario", email: email ?? "", rol }} />
       <main className="mx-auto w-full max-w-[1200px] space-y-10 px-4 pb-20 pt-10 sm:px-6 sm:pt-14 lg:px-8">{children}</main>
       <footer className="mx-auto max-w-[1200px] px-4 pb-10 sm:px-6 lg:px-8">
-        <p className="meta border-t pt-6">
-          {"// "}Universidad Cooperativa de Colombia · sede Pasto · datos tratados conforme a la Ley 1581 de 2012
-        </p>
+        <div className="space-y-1 border-t pt-6">
+          <p className="meta">{"// "}Universidad Cooperativa de Colombia · sede Pasto · datos tratados conforme a la Ley 1581 de 2012</p>
+          {/* Este layout lee la sesión y las cabeceras: todas sus páginas se renderizan en cada petición */}
+          <ModoRender modo="SSR" detalle="con datos personales: nunca se guarda en la CDN" />
+        </div>
       </footer>
     </div>
   );

@@ -4,9 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { ErrorApi } from "@/lib/errores";
 import { intentarBloquear } from "@/lib/bloqueos";
 import { ServicioEvaluacion, type ClienteBD } from "@/services/riesgo/ServicioEvaluacion";
-import { leerExcel } from "./excel";
-import { validarTabla, type ErrorFila, type EstudianteArchivo, type ResultadoLectura } from "./lector";
-import { ErrorCSV, parsearCSV } from "./csv";
+import { type ErrorFila, type EstudianteArchivo, type ResultadoLectura } from "./lector";
+import { ErrorArchivo, leerYValidar } from "./archivo";
 import { TAMANO_MAXIMO, TAMANO_MAXIMO_MB } from "./limites";
 
 /** Filas por INSERT: con 19 columnas son unos 9.500 parámetros, lejos del límite de PostgreSQL (65.535) */
@@ -37,30 +36,14 @@ export interface ResumenCarga {
   evaluados: number;
 }
 
-/** Texto de un CSV: UTF-8, y si trae caracteres inválidos (archivo guardado por Excel en Windows), Latin-1 */
-export function decodificarTexto(buffer: ArrayBuffer): string {
-  const utf8 = new TextDecoder("utf-8").decode(buffer);
-  return utf8.includes("�") ? new TextDecoder("latin1").decode(buffer) : utf8;
-}
-
+/** Lee y valida el archivo; un archivo ilegible es un error 400 con el motivo */
 export async function leerArchivo(nombre: string, buffer: ArrayBuffer): Promise<ResultadoLectura> {
-  const ext = nombre.toLowerCase().split(".").pop();
-  if (ext === "xlsx") {
-    try {
-      return validarTabla(await leerExcel(buffer));
-    } catch {
-      throw new ErrorApi(400, "No se pudo leer el archivo de Excel. Guárdalo como .xlsx o como CSV e inténtalo de nuevo.");
-    }
+  try {
+    return await leerYValidar(nombre, buffer);
+  } catch (e) {
+    if (e instanceof ErrorArchivo) throw new ErrorApi(400, e.message);
+    throw e;
   }
-  if (ext === "csv" || ext === "txt") {
-    try {
-      return validarTabla(parsearCSV(decodificarTexto(buffer)));
-    } catch (e) {
-      if (e instanceof ErrorCSV) throw new ErrorApi(400, e.message);
-      throw e;
-    }
-  }
-  throw new ErrorApi(400, "Formato no admitido. Sube un archivo .xlsx o .csv (puedes partir de la plantilla).");
 }
 
 /** Inserta o actualiza por código en lotes con un solo INSERT ... ON CONFLICT (rápido incluso con miles de filas) */

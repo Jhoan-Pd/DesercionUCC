@@ -1,0 +1,10 @@
+# Configuración de Buf (https://buf.build): compila, revisa el estilo y detecta cambios incompatibles del .proto
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

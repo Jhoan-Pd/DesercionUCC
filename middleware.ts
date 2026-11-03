@@ -42,6 +42,7 @@ export const config = {
     "/usuarios/:path*",
     "/api/estudiantes/:path*",
     "/api/agente/:path*",
+    "/api/grpc/:path*",
     "/api/cargas/:path*",
     "/api/usuarios/:path*",
   ],
