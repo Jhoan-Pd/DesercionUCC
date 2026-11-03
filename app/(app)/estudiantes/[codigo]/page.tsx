@@ -9,6 +9,7 @@ import { Encabezado } from "@/components/comunes/Encabezado";
 import { NivelBadge } from "@/components/estudiantes/NivelBadge";
 import { BarraPuntaje } from "@/components/estudiantes/BarraPuntaje";
 import { ExplicacionAgente } from "@/components/estudiantes/ExplicacionAgente";
+import { Simulador } from "@/components/estudiantes/Simulador";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 
@@ -104,6 +105,7 @@ export default async function FichaPage({ params }: { params: { codigo: string }
           )}
         </div>
 
+        <div className="space-y-5">
         <Card className="h-fit">
           <CardHeader>
             <CardTitle>datos del estudiante.</CardTitle>
@@ -125,6 +127,19 @@ export default async function FichaPage({ params }: { params: { codigo: string }
             </dl>
           </CardContent>
         </Card>
+
+        {ev && (
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle>¿y si…?</CardTitle>
+              <CardDescription>Cambia un dato para ver cómo cambiaría el riesgo, por ejemplo si se resuelve la mora o sube el promedio.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Simulador datos={e.datos} actual={{ puntaje: ev.puntaje, nivel: ev.nivel }} />
+            </CardContent>
+          </Card>
+        )}
+        </div>
       </div>
     </>
   );
