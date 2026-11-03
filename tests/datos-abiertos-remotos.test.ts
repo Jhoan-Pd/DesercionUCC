@@ -1,6 +1,7 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DATOS_UCC, resumenUccPasto } from "@/lib/datos-abiertos";
-import { construirDatosUcc, obtenerDatosUcc } from "@/lib/datos-abiertos-remotos";
+import { VIGENCIA_DATOS_ABIERTOS_S, construirDatosUcc, obtenerDatosUcc } from "@/lib/datos-abiertos-remotos";
 import type { FilaMatriculaMen } from "@/lib/datos-abiertos-depuracion";
 
 const fila = (p: Partial<FilaMatriculaMen>): FilaMatriculaMen => ({
@@ -46,5 +47,21 @@ describe("datos abiertos en vivo", () => {
     expect(r.datos).toBe(DATOS_UCC);
     expect(r.origen).toMatchObject({ tipo: "respaldo" });
     expect(resumenUccPasto(r.datos).ultimo.total).toBe(2097);
+  });
+});
+
+describe("patrones de rendering", () => {
+  const fuente = (ruta: string) => readFileSync(new URL(`../${ruta}`, import.meta.url), "utf8");
+
+  it("la página pública de datos abiertos es ISR con la misma vigencia que la caché de datos", () => {
+    // Next.js exige un literal en `export const revalidate`: la prueba evita que los dos valores se separen
+    const m = fuente("app/(publico)/datos-abiertos/page.tsx").match(/export const revalidate = (\d+);/);
+    expect(Number(m?.[1])).toBe(VIGENCIA_DATOS_ABIERTOS_S);
+  });
+
+  it("la portada es estática y no lee la sesión", () => {
+    const portada = fuente("app/(publico)/page.tsx");
+    expect(portada).toContain('export const dynamic = "force-static"');
+    expect(portada).not.toMatch(/getServerSession|headers\(|cookies\(/);
   });
 });
