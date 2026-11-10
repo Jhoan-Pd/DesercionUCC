@@ -61,32 +61,61 @@ const MAX_TOKENS_RESPUESTA = 4096;
 export const PLAZO_TOTAL_MS = 50_000;
 /** Temperatura baja: respuestas sobrias y apegadas a los datos */
 const TEMPERATURA_POR_DEFECTO = 0.2;
+/** Intentos de una misma consulta (reintentos y modelos alternos incluidos) */
+const MAX_INTENTOS = 4;
+/** Espera antes de repetir en el mismo modelo una consulta que falló por saturación */
+const ESPERA_REINTENTO_MS = 1_200;
+/**
+ * Errores pasajeros de Google: 429 (cuota del modelo agotada), 500/502/503/504 (modelo saturado o
+ * caído). La cuota gratuita es POR MODELO, así que con un 429 se pasa directo a otro modelo.
+ */
+const ESTADOS_PASAJEROS = new Set([429, 500, 502, 503, 504]);
+/** Modelos alternos si no se puede leer la lista de modelos de la cuenta */
+const MODELOS_ALTERNOS = ["gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"];
+/**
+ * Firma que Google acepta en lugar de la original cuando la conversación pasa a otro modelo: las
+ * firmas de razonamiento son propias del modelo que las generó y otro modelo las rechazaría.
+ */
+const FIRMA_OTRO_MODELO = "skip_thought_signature_validator";
 
 type Fetch = typeof fetch;
+type Esperar = (ms: number) => Promise<void>;
+const esperarReal: Esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Modelo resuelto en esta instancia del servidor (se reutiliza entre peticiones) */
 let modeloResuelto: string | null = null;
 
-/** Entre los modelos de la cuenta, prefiere un Flash estable que genere texto */
-export function elegirModelo(modelos: { name: string; supportedGenerationMethods?: string[] }[]): string | null {
+/** Modelos Flash de la cuenta que generan texto, del preferido al menos preferido (estables primero) */
+export function modelosFlash(modelos: { name: string; supportedGenerationMethods?: string[] }[]): string[] {
   const candidatos = modelos
     .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
     .map((m) => m.name.replace(/^models\//, ""))
     .filter((n) => n.includes("flash") && !/(image|tts|audio|live|embedding|thinking)/.test(n));
   const puntuar = (n: string) => (n.includes("preview") || n.includes("exp") ? 2 : 0) + (n.includes("lite") ? 1 : 0);
   candidatos.sort((a, b) => puntuar(a) - puntuar(b) || b.localeCompare(a, "en", { numeric: true }));
-  return candidatos[0] ?? null;
+  return candidatos;
+}
+
+/** Entre los modelos de la cuenta, prefiere un Flash estable que genere texto */
+export function elegirModelo(modelos: { name: string; supportedGenerationMethods?: string[] }[]): string | null {
+  return modelosFlash(modelos)[0] ?? null;
 }
 
 export class ClienteGemini {
   private readonly fetch: Fetch;
+  private readonly esperar: Esperar;
+  /** Modelos de la cuenta (se consultan una vez, solo si hace falta un alterno) */
+  private disponibles: string[] | null = null;
+  /** true después de pasar a un modelo alterno: las firmas de razonamiento previas ya no sirven */
+  private cambioDeModelo = false;
 
   constructor(
     private readonly apiKey: string,
     private modelo: string = MODELO_POR_DEFECTO,
-    opciones: { fetch?: Fetch } = {},
+    opciones: { fetch?: Fetch; esperar?: Esperar } = {},
   ) {
     this.fetch = opciones.fetch ?? fetch;
+    this.esperar = opciones.esperar ?? esperarReal;
   }
 
   /** null si no hay clave configurada (la aplicación sigue funcionando sin el agente) */
@@ -129,48 +158,93 @@ export class ClienteGemini {
     }
   }
 
-  private async resolverModelo(plazo: number): Promise<string | null> {
-    const r = await this.llamar(`${API}/models?pageSize=200`, { method: "GET" }, plazo);
-    if (!r.ok) return null;
-    const datos = r.cuerpo as { models?: { name: string; supportedGenerationMethods?: string[] }[] } | null;
-    return elegirModelo(datos?.models ?? []);
+  /** Flash disponibles en la cuenta; si la lista no se puede leer, los alternos conocidos */
+  private async modelosDisponibles(plazo: number): Promise<string[]> {
+    if (this.disponibles) return this.disponibles;
+    let lista: string[] = [];
+    try {
+      const r = await this.llamar(`${API}/models?pageSize=200`, { method: "GET" }, plazo);
+      if (r.ok) lista = modelosFlash((r.cuerpo as { models?: { name: string; supportedGenerationMethods?: string[] }[] } | null)?.models ?? []);
+    } catch (e) {
+      if (!(e instanceof ErrorIA)) throw e;
+    }
+    this.disponibles = lista.length > 0 ? lista : MODELOS_ALTERNOS;
+    return this.disponibles;
+  }
+
+  /** Primer modelo disponible que todavía no falló en esta consulta */
+  private async alterno(probados: ReadonlySet<string>, plazo: number): Promise<string | null> {
+    return (await this.modelosDisponibles(plazo)).find((m) => !probados.has(m)) ?? null;
+  }
+
+  private cambiarA(modelo: string): void {
+    console.warn(`[gemini] ${this.modelo} no está disponible; se usa ${modelo}`);
+    this.modelo = modelo;
+    this.cambioDeModelo = true;
+  }
+
+  private cuerpo(params: { sistema: string; contenidos: ContenidoGemini[]; funciones?: readonly DeclaracionFuncion[]; temperatura?: number }): string {
+    const contenidos = this.cambioDeModelo
+      ? params.contenidos.map((c) => ({ ...c, parts: c.parts.map((p) => (p.thoughtSignature ? { ...p, thoughtSignature: FIRMA_OTRO_MODELO } : p)) }))
+      : params.contenidos;
+    return JSON.stringify({
+      systemInstruction: { parts: [{ text: params.sistema }] },
+      contents: contenidos,
+      ...(params.funciones?.length ? { tools: [{ functionDeclarations: params.funciones }] } : {}),
+      generationConfig: { temperature: params.temperatura ?? TEMPERATURA_POR_DEFECTO, maxOutputTokens: MAX_TOKENS_RESPUESTA },
+    });
   }
 
   /**
    * @param params.plazo momento (ms desde epoch) en que debe terminar la operación completa; por
    *   defecto, PLAZO_TOTAL_MS desde ahora. El agente pasa el mismo plazo a todas sus rondas.
    */
+  /**
+   * Resiste las fallas pasajeras de Google (modelo saturado, cuota del modelo agotada): repite una vez
+   * en el mismo modelo tras una espera corta y después pasa a otro modelo Flash de la cuenta, siempre
+   * dentro del plazo total. Si el modelo configurado no existe, elige uno disponible.
+   */
   async generar(params: { sistema: string; contenidos: ContenidoGemini[]; funciones?: readonly DeclaracionFuncion[]; temperatura?: number; plazo?: number }): Promise<ParteGemini[]> {
     const plazo = params.plazo ?? Date.now() + PLAZO_TOTAL_MS;
-    const cuerpo = JSON.stringify({
-      systemInstruction: { parts: [{ text: params.sistema }] },
-      contents: params.contenidos,
-      ...(params.funciones?.length ? { tools: [{ functionDeclarations: params.funciones }] } : {}),
-      generationConfig: { temperature: params.temperatura ?? TEMPERATURA_POR_DEFECTO, maxOutputTokens: MAX_TOKENS_RESPUESTA },
-    });
+    const probados = new Set<string>();
+    let fallasEnModelo = 0;
+    let ultimoError: ErrorIA | null = null;
 
-    for (let intento = 0; intento < 2; intento++) {
-      const r = await this.llamar(`${API}/models/${encodeURIComponent(this.modelo)}:generateContent`, { method: "POST", body: cuerpo }, plazo);
-      if (r.estado === 404 && intento === 0) {
-        const otro = await this.resolverModelo(plazo);
-        if (otro && otro !== this.modelo) {
-          this.modelo = otro;
-          modeloResuelto = otro;
-          continue;
-        }
+    for (let intento = 0; intento < MAX_INTENTOS; intento++) {
+      const r = await this.llamar(`${API}/models/${encodeURIComponent(this.modelo)}:generateContent`, { method: "POST", body: this.cuerpo(params) }, plazo);
+      if (r.ok) return this.partesDe(r.cuerpo);
+
+      const noExiste = r.estado === 404;
+      if (!noExiste && !ESTADOS_PASAJEROS.has(r.estado)) throw errorDeRespuesta(r.estado, r.cuerpo);
+      ultimoError = errorDeRespuesta(r.estado, r.cuerpo);
+      fallasEnModelo++;
+
+      // Saturación (5xx): una espera corta suele bastar; se reintenta una vez en el mismo modelo
+      const tiempoParaEsperar = plazo - Date.now() > ESPERA_REINTENTO_MS * 3;
+      if (r.estado >= 500 && fallasEnModelo === 1 && tiempoParaEsperar) {
+        await this.esperar(ESPERA_REINTENTO_MS);
+        continue;
       }
-      if (!r.ok) throw errorDeRespuesta(r.estado, r.cuerpo);
-      const datos = (r.cuerpo ?? {}) as { candidates?: { content?: { parts?: ParteGemini[] }; finishReason?: string }[]; promptFeedback?: { blockReason?: string } };
-      if (datos.promptFeedback?.blockReason) throw new ErrorIA("Gemini no respondió a esta consulta por sus filtros de seguridad. Reformula la pregunta.", 422);
-      const candidato = datos.candidates?.[0];
-      // Una respuesta cortada se mostraría (y la explicación se guardaría) como si estuviera completa
-      if (candidato?.finishReason === "MAX_TOKENS") throw new ErrorIA("La respuesta de Gemini quedó incompleta. Intenta con una pregunta más concreta.", 502);
-      if (candidato?.finishReason === "SAFETY" || candidato?.finishReason === "RECITATION") throw new ErrorIA("Gemini no completó la respuesta por sus filtros de seguridad. Reformula la pregunta.", 422);
-      const partes = candidato?.content?.parts ?? [];
-      if (partes.length === 0) throw new ErrorIA("Gemini devolvió una respuesta vacía. Intenta de nuevo.", 502);
-      return partes;
+      probados.add(this.modelo);
+      const otro = await this.alterno(probados, plazo);
+      if (!otro) break;
+      if (noExiste) modeloResuelto = otro;
+      this.cambiarA(otro);
+      fallasEnModelo = 0;
     }
-    throw new ErrorIA("No se encontró un modelo de Gemini disponible para esta clave.", 502);
+    throw ultimoError ?? new ErrorIA("No se encontró un modelo de Gemini disponible para esta clave.", 502);
+  }
+
+  private partesDe(cuerpo: unknown): ParteGemini[] {
+    const datos = (cuerpo ?? {}) as { candidates?: { content?: { parts?: ParteGemini[] }; finishReason?: string }[]; promptFeedback?: { blockReason?: string } };
+    if (datos.promptFeedback?.blockReason) throw new ErrorIA("Gemini no respondió a esta consulta por sus filtros de seguridad. Reformula la pregunta.", 422);
+    const candidato = datos.candidates?.[0];
+    // Una respuesta cortada se mostraría (y la explicación se guardaría) como si estuviera completa
+    if (candidato?.finishReason === "MAX_TOKENS") throw new ErrorIA("La respuesta de Gemini quedó incompleta. Intenta con una pregunta más concreta.", 502);
+    if (candidato?.finishReason === "SAFETY" || candidato?.finishReason === "RECITATION") throw new ErrorIA("Gemini no completó la respuesta por sus filtros de seguridad. Reformula la pregunta.", 422);
+    const partes = candidato?.content?.parts ?? [];
+    if (partes.length === 0) throw new ErrorIA("Gemini devolvió una respuesta vacía. Intenta de nuevo.", 502);
+    return partes;
   }
 }
 
@@ -186,6 +260,7 @@ export function errorDeRespuesta(estado: number, cuerpo: unknown): ErrorIA {
   if (estado === 429) return new ErrorIA("Se alcanzó el límite de consultas gratuitas de Gemini. Espera un minuto e inténtalo de nuevo.", 429);
   if (estado === 404) return new ErrorIA("El modelo de Gemini configurado no existe. Revisa GEMINI_MODEL.", 502);
   if (estado === 400) return new ErrorIA("Gemini no aceptó la consulta (puede ser demasiado larga). Intenta con una pregunta más corta.", 502);
+  if (estado === 503 || estado === 500) return new ErrorIA("Los servidores de Gemini están saturados en este momento (alta demanda en Google). Intenta de nuevo en unos segundos.", 503);
   return new ErrorIA(`Gemini respondió con un error (${estado}). Intenta de nuevo en un momento.`, 502);
 }
 

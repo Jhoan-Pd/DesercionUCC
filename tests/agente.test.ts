@@ -36,7 +36,8 @@ describe("Cliente de Gemini", () => {
   });
 
   it("traduce los errores de cuota y de clave a mensajes claros", async () => {
-    const c429 = new ClienteGemini("K", "m", { fetch: vi.fn().mockResolvedValue(respuesta({ error: { status: "RESOURCE_EXHAUSTED" } }, 429)) });
+    // Cada llamada recibe una respuesta nueva (un cuerpo solo se puede leer una vez)
+    const c429 = new ClienteGemini("K", "m", { fetch: vi.fn().mockImplementation(async () => respuesta({ error: { status: "RESOURCE_EXHAUSTED" } }, 429)) });
     await expect(c429.generar({ sistema: "S", contenidos: [] })).rejects.toThrow(/límite de consultas gratuitas/);
     const c400 = new ClienteGemini("K", "m", { fetch: vi.fn().mockResolvedValue(respuesta({ error: { status: "INVALID_ARGUMENT", message: "API key not valid" } }, 400)) });
     await expect(c400.generar({ sistema: "S", contenidos: [] })).rejects.toBeInstanceOf(ErrorIA);
@@ -135,6 +136,46 @@ describe("historial del chat", () => {
     expect(historial).toHaveLength(MAX_HISTORIAL);
     expect(historial[0].texto.startsWith("m20")).toBe(true);
     expect(preguntaAgenteSchema.safeParse({ pregunta: "¿y ahora?", historial }).success).toBe(true);
+  });
+});
+
+describe("Cliente de Gemini: modelo saturado o sin cuota", () => {
+  const saturado = () => respuesta({ error: { code: 503, status: "UNAVAILABLE", message: "The model is overloaded." } }, 503);
+  const sinCuota = () => respuesta({ error: { code: 429, status: "RESOURCE_EXHAUSTED" } }, 429);
+  const lista = () => respuesta({ models: [{ name: "models/gemini-a-flash", supportedGenerationMethods: ["generateContent"] }, { name: "models/gemini-b-flash-lite", supportedGenerationMethods: ["generateContent"] }] });
+  const urlDe = (f: ReturnType<typeof vi.fn>, i: number) => String(f.mock.calls[i][0]);
+
+  it("con un 503 espera y repite en el mismo modelo", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(saturado()).mockResolvedValueOnce(candidato([{ text: "Listo" }]));
+    const esperar = vi.fn().mockResolvedValue(undefined);
+    const partes = await new ClienteGemini("K", "gemini-a-flash", { fetch, esperar }).generar({ sistema: "s", contenidos: [] });
+    expect(partes[0].text).toBe("Listo");
+    expect(esperar).toHaveBeenCalledOnce();
+    expect(urlDe(fetch, 1)).toContain("/models/gemini-a-flash:generateContent");
+  });
+
+  it("si sigue saturado pasa a otro Flash y reemplaza las firmas del modelo anterior", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(saturado()).mockResolvedValueOnce(saturado()).mockResolvedValueOnce(lista()).mockResolvedValueOnce(candidato([{ text: "Listo" }]));
+    const c = new ClienteGemini("K", "gemini-a-flash", { fetch, esperar: async () => {} });
+    const contenidos = [{ role: "model" as const, parts: [{ functionCall: { name: "resumen_riesgo" }, thoughtSignature: "firma-de-a" }] }];
+    await c.generar({ sistema: "s", contenidos });
+    expect(urlDe(fetch, 3)).toContain("/models/gemini-b-flash-lite:generateContent");
+    expect(JSON.parse(fetch.mock.calls[3][1].body).contents[0].parts[0].thoughtSignature).toBe("skip_thought_signature_validator");
+    expect(c.nombreModelo).toBe("gemini-b-flash-lite");
+  });
+
+  it("con un 429 (cuota del modelo) cambia de modelo sin esperar", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(sinCuota()).mockResolvedValueOnce(lista()).mockResolvedValueOnce(candidato([{ text: "Listo" }]));
+    const esperar = vi.fn();
+    await new ClienteGemini("K", "gemini-a-flash", { fetch, esperar }).generar({ sistema: "s", contenidos: [] });
+    expect(esperar).not.toHaveBeenCalled();
+    expect(urlDe(fetch, 2)).toContain("/models/gemini-b-flash-lite:generateContent");
+  });
+
+  it("si todos los modelos están saturados, el mensaje lo dice (y no se intenta sin fin)", async () => {
+    const fetch = vi.fn().mockImplementation(async (url: string) => (String(url).includes("/models?") ? lista() : saturado()));
+    await expect(new ClienteGemini("K", "gemini-a-flash", { fetch, esperar: async () => {} }).generar({ sistema: "s", contenidos: [] })).rejects.toThrow(/saturados/);
+    expect(fetch.mock.calls.filter(([u]) => String(u).includes(":generateContent")).length).toBeLessThanOrEqual(4);
   });
 });
 
