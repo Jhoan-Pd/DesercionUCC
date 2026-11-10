@@ -1,5 +1,19 @@
+import {
+  ErrorIA,
+  MAX_TOKENS_RESPUESTA,
+  PLAZO_TOTAL_MS,
+  TEMPERATURA_POR_DEFECTO,
+  esperarReal,
+  type ContenidoIA as ContenidoGemini,
+  type DeclaracionFuncion,
+  type Esperar,
+  type ModeloIA,
+  type ParametrosGeneracion,
+  type ParteIA as ParteGemini,
+} from "./tipos";
+
 /**
- * Cliente mínimo de la API de Google Gemini (REST, sin dependencias).
+ * Cliente mínimo de la API de Google Gemini (REST, sin dependencias). Implementa ModeloIA.
  *
  *   GEMINI_API_KEY  clave creada en Google AI Studio (https://aistudio.google.com/apikey)
  *   GEMINI_MODEL    opcional; por defecto "gemini-flash-latest" (alias que Google mantiene apuntando
@@ -9,58 +23,13 @@
  * Privacidad: a Gemini solo se envían datos académicos SIN nombre ni documento (ver services/agente).
  */
 
-export interface ParteGemini {
-  text?: string;
-  functionCall?: { name: string; args?: Record<string, unknown> };
-  functionResponse?: { name: string; response: Record<string, unknown> };
-  /** Firma que algunos modelos exigen recibir de vuelta junto a la llamada a función */
-  thoughtSignature?: string;
-}
-
-export interface ContenidoGemini {
-  role: "user" | "model";
-  parts: ParteGemini[];
-}
-
-/** Esquema de parámetros (subconjunto de OpenAPI que acepta Gemini) */
-export interface EsquemaGemini {
-  readonly type: "OBJECT" | "STRING" | "INTEGER" | "NUMBER" | "BOOLEAN" | "ARRAY";
-  readonly description?: string;
-  readonly enum?: readonly string[];
-  readonly properties?: Readonly<Record<string, EsquemaGemini>>;
-  readonly items?: EsquemaGemini;
-  readonly required?: readonly string[];
-}
-
-export interface DeclaracionFuncion {
-  readonly name: string;
-  readonly description: string;
-  readonly parameters?: EsquemaGemini;
-}
-
-export class ErrorIA extends Error {
-  constructor(
-    mensaje: string,
-    public readonly estado: number = 502,
-  ) {
-    super(mensaje);
-    this.name = "ErrorIA";
-  }
-}
+export type { ContenidoIA as ContenidoGemini, DeclaracionFuncion, ParteIA as ParteGemini } from "./tipos";
+export { ErrorIA, PLAZO_TOTAL_MS, textoDe } from "./tipos";
 
 export const MODELO_POR_DEFECTO = "gemini-flash-latest";
 const API = "https://generativelanguage.googleapis.com/v1beta";
 /** Tiempo máximo de espera por cada llamada a Gemini (además, cada operación tiene un plazo total) */
 const TIEMPO_MAXIMO_MS = 30_000;
-/** Los modelos que «piensan» descuentan el razonamiento de este límite: se deja margen para el texto */
-const MAX_TOKENS_RESPUESTA = 4096;
-/**
- * Plazo total de una operación con IA (todas sus llamadas). Las rutas tienen 60 s (maxDuration):
- * se deja margen para responder un error claro en vez de que la plataforma corte la función.
- */
-export const PLAZO_TOTAL_MS = 50_000;
-/** Temperatura baja: respuestas sobrias y apegadas a los datos */
-const TEMPERATURA_POR_DEFECTO = 0.2;
 /** Intentos de una misma consulta (reintentos y modelos alternos incluidos) */
 const MAX_INTENTOS = 4;
 /** Espera antes de repetir en el mismo modelo una consulta que falló por saturación */
@@ -79,8 +48,6 @@ const MODELOS_ALTERNOS = ["gemini-flash-lite-latest", "gemini-2.5-flash", "gemin
 const FIRMA_OTRO_MODELO = "skip_thought_signature_validator";
 
 type Fetch = typeof fetch;
-type Esperar = (ms: number) => Promise<void>;
-const esperarReal: Esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Modelo resuelto en esta instancia del servidor (se reutiliza entre peticiones) */
 let modeloResuelto: string | null = null;
@@ -101,7 +68,7 @@ export function elegirModelo(modelos: { name: string; supportedGenerationMethods
   return modelosFlash(modelos)[0] ?? null;
 }
 
-export class ClienteGemini {
+export class ClienteGemini implements ModeloIA {
   private readonly fetch: Fetch;
   private readonly esperar: Esperar;
   /** Modelos de la cuenta (se consultan una vez, solo si hace falta un alterno) */
@@ -119,10 +86,10 @@ export class ClienteGemini {
   }
 
   /** null si no hay clave configurada (la aplicación sigue funcionando sin el agente) */
-  static desdeEntorno(): ClienteGemini | null {
-    const clave = process.env.GEMINI_API_KEY?.trim();
+  static desdeEntorno(entorno: Record<string, string | undefined> = process.env): ClienteGemini | null {
+    const clave = entorno.GEMINI_API_KEY?.trim();
     if (!clave) return null;
-    return new ClienteGemini(clave, process.env.GEMINI_MODEL?.trim() || modeloResuelto || MODELO_POR_DEFECTO);
+    return new ClienteGemini(clave, entorno.GEMINI_MODEL?.trim() || modeloResuelto || MODELO_POR_DEFECTO);
   }
 
   get nombreModelo(): string {
@@ -183,13 +150,20 @@ export class ClienteGemini {
     this.cambioDeModelo = true;
   }
 
-  private cuerpo(params: { sistema: string; contenidos: ContenidoGemini[]; funciones?: readonly DeclaracionFuncion[]; temperatura?: number }): string {
+  private cuerpo(params: ParametrosGeneracion): string {
     const contenidos = this.cambioDeModelo
       ? params.contenidos.map((c) => ({ ...c, parts: c.parts.map((p) => (p.thoughtSignature ? { ...p, thoughtSignature: FIRMA_OTRO_MODELO } : p)) }))
       : params.contenidos;
+    // Una llamada a función que generó otro proveedor (Groq) no trae firma de Gemini: sin ella, los
+    // modelos que razonan rechazan la conversación, así que se marca como venida de otro modelo
+    const conFirmas = contenidos.map((c) =>
+      c.role === "model" && c.parts.some((p) => p.functionCall && !p.thoughtSignature)
+        ? { ...c, parts: c.parts.map((p) => (p.functionCall && !p.thoughtSignature ? { ...p, thoughtSignature: FIRMA_OTRO_MODELO } : p)) }
+        : c,
+    );
     return JSON.stringify({
       systemInstruction: { parts: [{ text: params.sistema }] },
-      contents: contenidos,
+      contents: conFirmas,
       ...(params.funciones?.length ? { tools: [{ functionDeclarations: params.funciones }] } : {}),
       generationConfig: { temperature: params.temperatura ?? TEMPERATURA_POR_DEFECTO, maxOutputTokens: MAX_TOKENS_RESPUESTA },
     });
@@ -204,7 +178,7 @@ export class ClienteGemini {
    * en el mismo modelo tras una espera corta y después pasa a otro modelo Flash de la cuenta, siempre
    * dentro del plazo total. Si el modelo configurado no existe, elige uno disponible.
    */
-  async generar(params: { sistema: string; contenidos: ContenidoGemini[]; funciones?: readonly DeclaracionFuncion[]; temperatura?: number; plazo?: number }): Promise<ParteGemini[]> {
+  async generar(params: ParametrosGeneracion): Promise<ParteGemini[]> {
     const plazo = params.plazo ?? Date.now() + PLAZO_TOTAL_MS;
     const probados = new Set<string>();
     let fallasEnModelo = 0;
@@ -264,10 +238,3 @@ export function errorDeRespuesta(estado: number, cuerpo: unknown): ErrorIA {
   return new ErrorIA(`Gemini respondió con un error (${estado}). Intenta de nuevo en un momento.`, 502);
 }
 
-/** Texto de la respuesta (une las partes de texto) */
-export function textoDe(partes: ParteGemini[]): string {
-  return partes
-    .map((p) => p.text ?? "")
-    .join("")
-    .trim();
-}

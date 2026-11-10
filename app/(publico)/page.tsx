@@ -17,7 +17,7 @@ export const dynamic = "force-static";
 const PILARES = [
   { icono: Database, titulo: "datos reales.", texto: "La universidad carga su archivo de estudiantes. Si un dato no viene, no se usa ni se inventa." },
   { icono: ShieldCheck, titulo: "riesgo explicado.", texto: "Puntaje por factores del MEN-SPADIES o un modelo entrenado con estudiantes de la UCC que ya se retiraron o se graduaron." },
-  { icono: Bot, titulo: "un agente que ayuda.", texto: "Gemini explica cada caso y sugiere acciones de Bienestar, sin recibir nunca nombres ni documentos." },
+  { icono: Bot, titulo: "un agente que ayuda.", texto: "La IA explica cada caso y sugiere acciones de Bienestar, sin recibir nunca nombres ni documentos." },
 ] as const;
 
 export default function Portada() {

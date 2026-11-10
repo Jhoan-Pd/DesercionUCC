@@ -25,7 +25,7 @@ const SUGERENCIAS = [
   "¿Cómo ha cambiado la matrícula de la UCC Pasto desde 2015?",
 ];
 
-/** Chat con el agente de IA. Los nombres de los estudiantes se agregan en el servidor (no se envían a Gemini). */
+/** Chat con el agente de IA. Los nombres de los estudiantes se agregan en el servidor (no se envían a la IA). */
 export function ChatAgente() {
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [pregunta, setPregunta] = useState("");

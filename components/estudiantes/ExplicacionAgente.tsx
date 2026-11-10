@@ -55,7 +55,7 @@ export function ExplicacionAgente({ codigo, inicial }: { codigo: string; inicial
             <span className="meta">
               {"// "}
               {resultado.origen === "IA"
-                ? `Redactado por ${resultado.modeloIa ?? "Gemini"}${resultado.explicadaEn ? ` el ${formatoFechaHora(resultado.explicadaEn)}` : ""}. Revísalo antes de actuar.`
+                ? `Redactado por ${resultado.modeloIa ?? "el agente de IA"}${resultado.explicadaEn ? ` el ${formatoFechaHora(resultado.explicadaEn)}` : ""}. Revísalo antes de actuar.`
                 : "Explicación calculada por el sistema (sin IA)."}
             </span>
             <Button variant="outline" size="sm" onClick={() => pedir(true)}>

@@ -1,4 +1,4 @@
-import { ClienteGemini, ErrorIA, PLAZO_TOTAL_MS, textoDe, type ContenidoGemini, type ParteGemini } from "@/lib/ia/gemini";
+import { ErrorIA, PLAZO_TOTAL_MS, textoDe, type ContenidoIA, type ModeloIA, type ParteIA } from "@/lib/ia/tipos";
 import { formatoFechaLarga } from "@/lib/formato";
 import type { Herramientas } from "./declaraciones";
 import { MAX_HISTORIAL } from "@/lib/validators/agente";
@@ -53,17 +53,17 @@ function recogerCodigos(valor: unknown, destino: Set<string>): void {
 
 /**
  * Agente conversacional con llamadas a funciones (function calling):
- * Gemini decide qué herramienta consultar, el servidor la ejecuta contra la base de datos y le
- * devuelve el resultado, hasta que Gemini redacta la respuesta final (máximo MAX_RONDAS consultas).
+ * el modelo (Groq o Gemini) decide qué herramienta consultar, el servidor la ejecuta contra la base de
+ * datos y le devuelve el resultado, hasta que el modelo redacta la respuesta final (máximo MAX_RONDAS consultas).
  */
 export class Agente {
   constructor(
-    private readonly cliente: ClienteGemini,
+    private readonly cliente: ModeloIA,
     private readonly herramientas: Herramientas,
   ) {}
 
   async responder(pregunta: string, historial: MensajeChat[] = []): Promise<RespuestaAgente> {
-    const contenidos: ContenidoGemini[] = historial.slice(-MAX_HISTORIAL).map((m) => ({ role: m.rol === "usuario" ? "user" : "model", parts: [{ text: m.texto }] }));
+    const contenidos: ContenidoIA[] = historial.slice(-MAX_HISTORIAL).map((m) => ({ role: m.rol === "usuario" ? "user" : "model", parts: [{ text: m.texto }] }));
     contenidos.push({ role: "user", parts: [{ text: pregunta }] });
 
     const usadas: string[] = [];
@@ -72,7 +72,7 @@ export class Agente {
     const plazo = Date.now() + PLAZO_TOTAL_MS;
     for (let ronda = 0; ronda <= MAX_RONDAS; ronda++) {
       const partes = await this.cliente.generar({ sistema: sistemaAgente(), contenidos, funciones: ronda < MAX_RONDAS ? this.herramientas.declaraciones : undefined, plazo });
-      const llamadas = partes.filter((p): p is ParteGemini & { functionCall: NonNullable<ParteGemini["functionCall"]> } => Boolean(p.functionCall));
+      const llamadas = partes.filter((p): p is ParteIA & { functionCall: NonNullable<ParteIA["functionCall"]> } => Boolean(p.functionCall));
       if (llamadas.length === 0) {
         const respuesta = textoDe(partes);
         if (!respuesta) throw new ErrorIA("El agente no generó una respuesta. Intenta reformular la pregunta.", 502);
@@ -80,7 +80,7 @@ export class Agente {
       }
       // Se devuelve al modelo su propio turno tal cual (incluye la firma de las llamadas)
       contenidos.push({ role: "model", parts: partes });
-      const respuestas: ParteGemini[] = [];
+      const respuestas: ParteIA[] = [];
       for (const llamada of llamadas) {
         usadas.push(llamada.functionCall.name);
         let resultado: Record<string, unknown>;

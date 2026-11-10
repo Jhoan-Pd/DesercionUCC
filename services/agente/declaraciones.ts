@@ -1,4 +1,4 @@
-import type { DeclaracionFuncion } from "@/lib/ia/gemini";
+import type { DeclaracionFuncion } from "@/lib/ia/tipos";
 import { NIVELES } from "@/services/riesgo/niveles";
 
 /**
@@ -44,7 +44,7 @@ export function esNombreHerramienta(nombre: string): nombre is NombreHerramienta
 }
 
 /**
- * Lo que el agente necesita de sus herramientas: qué describirle a Gemini y cómo ejecutar cada una.
+ * Lo que el agente necesita de sus herramientas: qué describirle al modelo de IA y cómo ejecutar cada una.
  * Declaración y ejecución viajan juntas, así un doble de prueba no puede anunciar herramientas que no ejecuta.
  */
 export interface Herramientas {

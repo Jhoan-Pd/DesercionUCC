@@ -1,6 +1,6 @@
 # Observatorio de Deserción UCC
 
-Sistema web para **detectar a tiempo a los estudiantes que podrían retirarse** de la Universidad Cooperativa de Colombia (UCC), sede Pasto. Un **agente de IA (Google Gemini)** explica cada caso y responde preguntas del equipo de Bienestar Universitario.
+Sistema web para **detectar a tiempo a los estudiantes que podrían retirarse** de la Universidad Cooperativa de Colombia (UCC), sede Pasto. Un **agente de IA (Groq, con Google Gemini de respaldo)** explica cada caso y responde preguntas del equipo de Bienestar Universitario.
 
 Proyecto final de la asignatura *Programación Orientada a la Web*.
 
@@ -21,7 +21,7 @@ Proyecto final de la asignatura *Programación Orientada a la Web*.
 | **Inicio** | Admin y Bienestar | Estudiantes activos por nivel de riesgo, riesgo por programa, factores más frecuentes y el método de cálculo vigente. |
 | **Estudiantes en riesgo** | Admin y Bienestar | Lista ordenada del mayor al menor riesgo, con filtros por programa, nivel y búsqueda. |
 | **Ficha del estudiante** | Admin y Bienestar | Factores que explican su riesgo (con la fuente de cada factor), sus datos y la **explicación del agente** con acciones sugeridas. |
-| **Agente IA** | Admin y Bienestar | Chat con Gemini que consulta los datos del sistema («¿quiénes de Derecho tienen riesgo alto y por qué?»). |
+| **Agente IA** | Admin y Bienestar | Chat con IA que consulta los datos del sistema («¿quiénes de Derecho tienen riesgo alto y por qué?»). |
 | **Cifras oficiales UCC** | Admin y Bienestar | Matrícula oficial de la sede Pasto 2015-2021 por año, programa y sexo, comparación entre sedes y programas activos. |
 | **Cargar datos** | Admin | Subir el archivo de estudiantes (Excel o CSV), plantilla, historial de cargas y borrado total. |
 | **Usuarios** | Admin | Crear cuentas, cambiar rol, activar o desactivar, restablecer contraseña y desbloquear. |
@@ -110,12 +110,12 @@ El modelo se activa solo si se cumplen tres condiciones:
 
 Si no se cumplen, se sigue usando el puntaje por factores, y la página *Inicio* explica por qué. Con el modelo activo, el puntaje es la probabilidad estimada de retirarse. Los puntos de cada factor reparten el riesgo que el estudiante tiene por encima del estudiante promedio de la UCC.
 
-## 4. El agente de IA (Gemini)
+## 4. El agente de IA (Groq + Gemini de respaldo)
 
 - **Explicación por estudiante:**
-  - Gemini redacta en 130 palabras como máximo por qué el estudiante tiene ese nivel de riesgo y propone 2 o 3 acciones de Bienestar (tutorías, acuerdos de pago, acompañamiento de primer año…).
+  - La IA redacta en 130 palabras como máximo por qué el estudiante tiene ese nivel de riesgo y propone 2 o 3 acciones de Bienestar (tutorías, acuerdos de pago, acompañamiento de primer año…).
   - La explicación se guarda y se vuelve a generar si el riesgo cambia.
-- **Chat con llamadas a funciones (function calling):** Gemini decide qué consultar y el servidor ejecuta la consulta contra la base de datos. Herramientas disponibles:
+- **Chat con llamadas a funciones (function calling):** el modelo decide qué consultar y el servidor ejecuta la consulta contra la base de datos. Herramientas disponibles:
   - `resumen_riesgo`
   - `buscar_estudiantes`
   - `detalle_estudiante`
@@ -124,10 +124,14 @@ Si no se cumplen, se sigue usando el puntaje por factores, y la página *Inicio*
   - responde solo con lo que devuelven las herramientas y nunca inventa estudiantes ni cifras;
   - trata el riesgo como una alerta para acompañar, no como un juicio.
 - **Privacidad:**
-  - a Gemini **nunca se envían nombres ni documentos**; los estudiantes viajan por código y con datos académicos;
+  - a la IA **nunca se envían nombres ni documentos**; los estudiantes viajan por código y con datos académicos;
   - el servidor agrega los nombres a la respuesta para quien tiene permiso de verlos.
-- **Sin clave o con fallas:** sin `GEMINI_API_KEY`, todo funciona igual; el chat muestra un aviso y la ficha muestra una explicación calculada sin IA. Si Gemini falla o se alcanza el límite gratuito, también se muestra la explicación sin IA.
-- **Modelo:** por defecto es `gemini-flash-latest` (variable `GEMINI_MODEL`). Si ese modelo no existe para la clave, el cliente consulta la lista de modelos y elige un Flash disponible.
+- **Proveedores (`lib/ia`):** el agente depende de una interfaz común (`ModeloIA`, en `lib/ia/tipos.ts`), no de un proveedor:
+  - **Groq** (`lib/ia/groq.ts`) es el principal: API compatible con OpenAI, modelo `openai/gpt-oss-120b` por defecto (variable `GROQ_MODEL`). Traduce la conversación a `tool_calls` y mensajes `role: "tool"`.
+  - **Gemini** (`lib/ia/gemini.ts`) es el respaldo: modelo `gemini-flash-latest` por defecto (variable `GEMINI_MODEL`).
+  - `ModeloConRespaldo` (`lib/ia/respaldo.ts`) pasa la consulta a Gemini si Groq está saturado, sin cuota o con la clave mal configurada, y deja a Groq en pausa un minuto. `modeloDesdeEntorno` (`lib/ia/proveedor.ts`) arma la combinación según las claves que existan.
+  - Cada cliente resiste las fallas pasajeras: con un 503 espera y repite, y con un 429 pasa a otro modelo del mismo proveedor (la cuota gratuita es por modelo).
+- **Sin clave o con fallas:** sin `GROQ_API_KEY` ni `GEMINI_API_KEY`, todo funciona igual; el chat muestra un aviso y la ficha muestra una explicación calculada sin IA. Si los dos proveedores fallan, también se muestra la explicación sin IA.
 
 ## 5. Arquitectura
 
@@ -140,7 +144,7 @@ flowchart LR
     API --> S
     S --> L[Lógica pura<br/>lector de archivos · puntaje por factores<br/>modelo logístico · depuración de datos abiertos]
     S --> DB[(PostgreSQL · Neon)]
-    S --> G[Google Gemini API]
+    S --> G[Groq API<br/>respaldo: Google Gemini]
     L --> DA[data/datos-abiertos/ucc.json<br/>MEN · datos.gov.co]
     MW -->|gRPC-Web · Protobuf| GW["/api/grpc<br/>MotorRiesgo"]
     GW --> S
@@ -161,7 +165,7 @@ flowchart LR
 | `services/carga` | Lector de CSV y Excel, validación y guardado por lotes (`INSERT … ON CONFLICT`) |
 | `services/riesgo` | Variables, puntaje por factores, modelo logístico y servicio que recalcula |
 | `services/agente` | Herramientas, ciclo de function calling y explicaciones |
-| `lib/ia/gemini.ts` | Cliente REST de Gemini (sin dependencias) |
+| `lib/ia` | Interfaz común del modelo de IA, clientes REST de Groq y Gemini (sin dependencias) y respaldo automático |
 | `lib/datos-abiertos*.ts` | Filtro, depuración y resumen de los datos del MEN |
 | `prisma` | Esquema, migraciones y cuenta inicial del administrador |
 
@@ -238,7 +242,7 @@ Requisitos: Node 18.18 o superior y PostgreSQL (local o en Neon).
 
 ```bash
 npm install                 # instala y genera el cliente de Prisma
-cp .env.example .env        # edita DATABASE_URL, NEXTAUTH_SECRET, SEED_ADMIN_PASSWORD y GEMINI_API_KEY
+cp .env.example .env        # edita DATABASE_URL, NEXTAUTH_SECRET, SEED_ADMIN_PASSWORD y GROQ_API_KEY
 npx prisma migrate deploy   # crea las tablas
 npm run db:seed             # crea SOLO la cuenta del administrador (no hay datos de ejemplo)
 npm run dev                 # http://localhost:3000
@@ -255,7 +259,9 @@ Entra con `admin@ucc.edu.co` (o el correo de `SEED_ADMIN_EMAIL`) y la contraseñ
 | `NEXTAUTH_SECRET` | Sí | Firma de las sesiones (`openssl rand -base64 32`) |
 | `SEED_ADMIN_PASSWORD` | Para crear el primer admin | Contraseña inicial del administrador; no hay contraseña por defecto. `SEED_DEMO_PASSWORD` se acepta por compatibilidad |
 | `SEED_ADMIN_EMAIL` | No | Correo del primer administrador (por defecto `admin@ucc.edu.co`) |
-| `GEMINI_API_KEY` | Para el agente | Clave gratuita de [Google AI Studio](https://aistudio.google.com/apikey) |
+| `GROQ_API_KEY` | Para el agente | Clave gratuita de [Groq](https://console.groq.com/keys) (proveedor principal) |
+| `GROQ_MODEL` | No | Modelo de Groq (por defecto `openai/gpt-oss-120b`) |
+| `GEMINI_API_KEY` | No (respaldo) | Clave gratuita de [Google AI Studio](https://aistudio.google.com/apikey); se usa si Groq falla, o como único proveedor |
 | `GEMINI_MODEL` | No | Modelo de Gemini (por defecto `gemini-flash-latest`) |
 | `GRPC_TOKEN` | Para el servidor gRPC | Token de al menos 24 caracteres que exige `servidor-grpc/` (no se usa en Vercel) |
 | `GRPC_PUERTO` | No | Puerto del servidor gRPC (por defecto 50051) |
@@ -263,7 +269,7 @@ Entra con `admin@ucc.edu.co` (o el correo de `SEED_ADMIN_EMAIL`) y la contraseñ
 ## 9. Despliegue (Vercel + Neon)
 
 1. Importa el repositorio en Vercel y conecta Neon desde *Storage*. La integración crea `DATABASE_URL` y `DATABASE_URL_UNPOOLED`.
-2. En *Settings → Environment Variables* agrega `NEXTAUTH_SECRET`, `SEED_ADMIN_PASSWORD` y `GEMINI_API_KEY`.
+2. En *Settings → Environment Variables* agrega `NEXTAUTH_SECRET`, `SEED_ADMIN_PASSWORD`, `GROQ_API_KEY` y (opcional, como respaldo) `GEMINI_API_KEY`.
 3. Despliega. El script `vercel-build` hace cuatro cosas, en orden:
    1. genera el cliente de Prisma;
    2. aplica las migraciones (`prisma migrate deploy`);
@@ -297,7 +303,7 @@ Las pruebas cubren:
 - **Depuración de los datos del MEN:** los totales reales de Pasto, de 2.088 a 2.250 por año, y la suma de las sedes igual al total nacional.
 - **Lector de archivos:** CSV (comillas sueltas o sin cerrar), Excel (porcentajes y miles de filas en tiempo lineal), rangos, sí/no, duplicados y largo de los textos.
 - **Cálculo del riesgo:** el puntaje por factores, y que el modelo aprende y solo se activa con AUC ≥ 0,70.
-- **Agente:** cliente de Gemini (plazo total, cuerpos que no llegan, respuestas cortadas, errores de clave) y ciclo de function calling, con respuestas simuladas; historial del chat.
+- **Agente:** clientes de Groq y Gemini (traducción de la conversación, reintentos y modelo alterno con 503/429, plazo total, cuerpos que no llegan, respuestas cortadas, errores de clave), respaldo automático entre proveedores y ciclo de function calling, con respuestas simuladas; historial del chat.
 - **Permisos y seguridad:** los dos roles, las reglas de cuentas, la sesión (incluido el cambio de contraseña), el hash ficticio, el tamaño de los cuerpos y que el middleware proteja exactamente las rutas con regla.
 - **gRPC:** las llamadas unarias y el flujo del servidor (en memoria y de punta a punta por HTTP), el interceptor de autenticación, la traducción de errores a códigos gRPC y la conversión entre Protobuf y el dominio.
 - **Rendering y datos abiertos en vivo:** la descarga de datos.gov.co con su respaldo, que el `revalidate` de la página ISR coincida con la vigencia de la caché y que la portada estática no lea la sesión.

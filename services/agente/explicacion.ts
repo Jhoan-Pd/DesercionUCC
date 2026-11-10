@@ -51,7 +51,7 @@ export function accionesSugeridas(factores: FactorRiesgo[], maximo = 3): string[
   return [...acciones];
 }
 
-/** Explicación sin IA (se usa si no hay clave de Gemini o si Gemini falla). Determinista y verificable. */
+/** Explicación sin IA (se usa si no hay clave de IA o si los proveedores fallan). Determinista y verificable. */
 export function explicacionBasica(e: EntradaExplicacion): string {
   const lineas: string[] = [];
   const metodo = e.metodo === "MODELO" ? "el modelo entrenado con estudiantes de la UCC" : "el puntaje por factores de riesgo";
@@ -83,7 +83,7 @@ Reglas:
 - Si faltan datos importantes, menciónalo en una frase al final.
 - No uses encabezados ni negritas.`;
 
-/** Mensaje para Gemini con los datos SIN nombre ni código del estudiante */
+/** Mensaje para la IA con los datos SIN nombre ni código del estudiante */
 export function promptExplicacion(e: EntradaExplicacion): string {
   const datos = (Object.keys(e.datos) as ClaveVariable[]).filter((k) => tieneValor(e.datos[k])).map((k) => `- ${describirValor(k, e.datos[k] as number | boolean)}`);
   const factores = e.factores.length ? e.factores.map((f) => `- ${f.etiqueta} (+${f.puntos} puntos): ${f.detalle}`) : ["- Ninguno"];

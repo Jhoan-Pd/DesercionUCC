@@ -12,7 +12,7 @@ import { DECLARACIONES, esNombreHerramienta, type Herramientas, type NombreHerra
  * cifras oficiales). Ninguna devuelve nombres, documentos ni datos de contacto.
  */
 
-/** Función que atiende una herramienta con los argumentos que envía Gemini */
+/** Función que atiende una herramienta con los argumentos que envía el modelo de IA */
 type Ejecutor = (args: Record<string, unknown>) => Promise<Record<string, unknown>> | Record<string, unknown>;
 
 /** Implementación real sobre la base de datos */
