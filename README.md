@@ -1,7 +1,7 @@
 # Observatorio de Deserción UCC
 
 Sistema web para **detectar a tiempo a los estudiantes que podrían retirarse** de la Universidad Cooperativa de Colombia (UCC), sede Pasto. Un **agente de IA (Groq, con Google Gemini de respaldo)** explica cada caso y responde preguntas del equipo de Bienestar Universitario.
-USER: Admin@gmail.com
+USER: admin@campusucc.edu.co
 PASWORD: 347DTQFa.
 
 Proyecto final de la asignatura *Programación Orientada a la Web*.
